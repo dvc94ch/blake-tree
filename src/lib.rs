@@ -100,6 +100,13 @@ impl Children {
             _ => None,
         }
     }
+
+    fn as_deref_mut(&mut self) -> Option<&mut (Node, Node)> {
+        match self {
+            Self::Tree(nodes) => Some(&mut **nodes),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -226,8 +233,59 @@ impl Node {
         Some(node)
     }
 
-    pub fn verify(&mut self, _tree: &Self, _bytes: &[u8]) -> Result<()> {
-        todo!()
+    fn inner_verify(&mut self, other: &Self, offset: u64, bytes: &[u8]) -> Result<()> {
+        anyhow::ensure!(self.is_root() == other.is_root());
+        anyhow::ensure!(self.range() == other.range());
+        anyhow::ensure!(self.hash() == other.hash());
+        if self.is_chunk() {
+            if self.children == Children::None && other.children != Children::None {
+                let start = (self.range().offset() - offset) as usize;
+                let end = (self.range().end() - offset) as usize;
+                anyhow::ensure!(bytes.len() >= start);
+                anyhow::ensure!(bytes.len() >= end);
+                let hash = blake3::guts::ChunkState::new(self.range().index())
+                    .update(&bytes[start..end])
+                    .finalize(self.is_root());
+                anyhow::ensure!(self.hash() == &hash);
+                self.children = Children::Data;
+            }
+        } else {
+            let (left_range, right_range) = self.range().split().unwrap();
+            let (other_left, other_right) = if let Some((left, right)) = other.children.as_deref() {
+                (left, right)
+            } else {
+                return Ok(());
+            };
+
+            if self.children == Children::None {
+                let hash =
+                    blake3::guts::parent_cv(other_left.hash(), other_right.hash(), self.is_root());
+                anyhow::ensure!(self.hash() == &hash);
+
+                let left = Node {
+                    range: left_range,
+                    is_root: false,
+                    hash: *other_left.hash(),
+                    children: Children::None,
+                };
+                let right = Node {
+                    range: right_range,
+                    is_root: false,
+                    hash: *other_right.hash(),
+                    children: Children::None,
+                };
+                self.children = Children::Tree(Box::new((left, right)));
+            }
+
+            let (left, right) = self.children.as_deref_mut().unwrap();
+            left.inner_verify(other_left, offset, bytes)?;
+            right.inner_verify(other_right, offset, bytes)?;
+        }
+        Ok(())
+    }
+
+    pub fn verify(&mut self, other: &Self, bytes: &[u8]) -> Result<()> {
+        self.inner_verify(other, other.ranges()[0].offset(), bytes)
     }
 
     fn inner_ranges(&self, ranges: &mut Vec<Range>) {
@@ -303,9 +361,9 @@ mod tests {
         let buf = [0x42; 65537];
         for &case in TEST_CASES {
             dbg!(case);
-            let input = &buf[..(case as _)];
-            let expected = blake3::hash(input);
-            let tree = Node::new(input);
+            let bytes = &buf[..(case as _)];
+            let expected = blake3::hash(bytes);
+            let tree = Node::new(bytes);
             //dbg!(&tree);
             assert_eq!(tree.hash(), &expected);
             assert!(tree.complete());
@@ -313,7 +371,19 @@ mod tests {
             assert_eq!(tree.ranges(), vec![tree.range]);
             assert_eq!(tree.missing_ranges(), vec![]);
 
+            let mut tree2 = Node::root(*tree.hash(), tree.range().length());
+            assert_eq!(tree2.hash(), &expected);
+            assert!(!tree2.complete());
+            assert_eq!(tree2.length(), None);
+            assert_eq!(tree2.ranges(), vec![]);
+            assert_eq!(tree2.missing_ranges(), vec![tree.range]);
+
+            tree2.verify(&tree, bytes).unwrap();
+            assert_eq!(tree2, tree);
+
             if let Some((left, right)) = tree.range().split() {
+                let (left_bytes, right_bytes) = buf.split_at(left.end() as _);
+
                 dbg!(left);
                 let left_tree = tree.extract(&left).unwrap();
                 dbg!(&left_tree);
@@ -333,11 +403,10 @@ mod tests {
                 assert_eq!(right_tree.missing_ranges(), vec![left]);
 
                 let mut tree2 = Node::root(*tree.hash(), tree.range().length());
-                let (left_bytes, right_bytes) = buf.split_at(left.end() as _);
-
-                //tree2.verify(&left_tree, left_bytes).unwrap();
-                //tree2.verify(&right_tree, right_bytes).unwrap();
-                //assert_eq!(tree, tree2);
+                tree2.verify(&left_tree, left_bytes).unwrap();
+                assert_eq!(tree2, left_tree);
+                tree2.verify(&right_tree, right_bytes).unwrap();
+                assert_eq!(tree2, tree);
             }
         }
     }
