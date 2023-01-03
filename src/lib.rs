@@ -100,7 +100,7 @@ impl std::fmt::Display for Range {
 enum Children {
     None,
     Data,
-    Tree(Box<(Node, Node)>),
+    Tree(Box<(Tree, Tree)>),
 }
 
 impl Children {
@@ -108,14 +108,14 @@ impl Children {
         self == &Self::None
     }
 
-    fn as_deref(&self) -> Option<&(Node, Node)> {
+    fn as_deref(&self) -> Option<&(Tree, Tree)> {
         match self {
             Self::Tree(nodes) => Some(&**nodes),
             _ => None,
         }
     }
 
-    fn as_deref_mut(&mut self) -> Option<&mut (Node, Node)> {
+    fn as_deref_mut(&mut self) -> Option<&mut (Tree, Tree)> {
         match self {
             Self::Tree(nodes) => Some(&mut **nodes),
             _ => None,
@@ -124,52 +124,20 @@ impl Children {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Node {
+pub struct Tree {
     range: Range,
     is_root: bool,
     hash: Hash,
     children: Children,
 }
 
-impl Node {
-    pub fn root(hash: Hash, length: u64) -> Self {
+impl Tree {
+    pub fn new(hash: Hash, length: u64) -> Self {
         Self {
             range: Range::new(length),
             is_root: true,
             hash,
             children: Children::None,
-        }
-    }
-
-    pub fn new(bytes: &[u8]) -> Self {
-        let range = Range::new(bytes.len() as _);
-        Self::inner_new(range, true, bytes)
-    }
-
-    fn inner_new(range: Range, is_root: bool, bytes: &[u8]) -> Self {
-        debug_assert_eq!(range.length(), bytes.len() as u64);
-        if let Some((left_range, right_range)) = range.split() {
-            let at = left_range.end() - left_range.offset();
-            let (left_bytes, right_bytes) = bytes.split_at(at as _);
-            let left = Node::inner_new(left_range, false, left_bytes);
-            let right = Node::inner_new(right_range, false, right_bytes);
-            let hash = blake3::guts::parent_cv(left.hash(), right.hash(), is_root);
-            Self {
-                range,
-                is_root,
-                hash,
-                children: Children::Tree(Box::new((left, right))),
-            }
-        } else {
-            let hash = blake3::guts::ChunkState::new(range.index())
-                .update(bytes)
-                .finalize(is_root);
-            Self {
-                range,
-                is_root,
-                hash,
-                children: Children::Data,
-            }
         }
     }
 
@@ -189,11 +157,11 @@ impl Node {
         self.range.is_chunk()
     }
 
-    pub fn left(&self) -> Option<&Node> {
+    pub fn left(&self) -> Option<&Tree> {
         self.children.as_deref().map(|(left, _)| left)
     }
 
-    pub fn right(&self) -> Option<&Node> {
+    pub fn right(&self) -> Option<&Tree> {
         self.children.as_deref().map(|(_, right)| right)
     }
 
@@ -207,7 +175,7 @@ impl Node {
         }
     }
 
-    pub fn last_chunk(&self) -> &Node {
+    pub fn last_chunk(&self) -> &Tree {
         if let Some(right) = self.right() {
             right.last_chunk()
         } else {
@@ -405,6 +373,115 @@ impl Node {
     }
 }
 
+#[derive(Clone)]
+pub struct TreeHasher {
+    stack: Vec<Tree>,
+    chunk: [u8; 1024],
+    chunk_length: usize,
+    length: u64,
+    chunks: usize,
+}
+
+impl Default for TreeHasher {
+    fn default() -> Self {
+        Self {
+            stack: vec![],
+            chunk: [0; 1024],
+            chunk_length: 0,
+            length: 0,
+            chunks: 0,
+        }
+    }
+}
+
+impl TreeHasher {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    fn fill_chunk(&mut self, bytes: &[u8]) {
+        debug_assert!(self.chunk_length + bytes.len() <= CHUNK_SIZE as _);
+        let chunk_length = self.chunk_length + bytes.len();
+        self.chunk[self.chunk_length..chunk_length].copy_from_slice(bytes);
+        self.chunk_length = chunk_length;
+        self.length += bytes.len() as u64;
+    }
+
+    fn end_chunk(&mut self, finalize: bool) {
+        let is_root = finalize && self.stack.is_empty();
+        let range = Range {
+            offset: self.length - self.chunk_length as u64,
+            length: self.chunk_length as _,
+        };
+        let hash = blake3::guts::ChunkState::new(range.index())
+            .update(&self.chunk[..self.chunk_length])
+            .finalize(is_root);
+        let mut right = Tree {
+            range,
+            is_root,
+            hash,
+            children: Children::Data,
+        };
+        self.chunks += 1;
+        self.chunk_length = 0;
+
+        let mut total_chunks = self.chunks;
+        while total_chunks & 1 == 0 {
+            let left = self.stack.pop().unwrap();
+            let is_root = finalize && self.stack.is_empty();
+            let hash = blake3::guts::parent_cv(left.hash(), right.hash(), is_root);
+            let offset = left.range().offset();
+            let length = left.range().length() + right.range().length();
+            let range = Range { offset, length };
+            right = Tree {
+                range,
+                is_root,
+                hash,
+                children: Children::Tree(Box::new((left, right))),
+            };
+            total_chunks >>= 1;
+        }
+        self.stack.push(right);
+    }
+
+    pub fn update(&mut self, mut bytes: &[u8]) {
+        let split = CHUNK_SIZE as usize - self.chunk_length;
+        while split < bytes.len() as _ {
+            let (chunk, rest) = bytes.split_at(split);
+            self.fill_chunk(chunk);
+            bytes = rest;
+            self.end_chunk(false);
+        }
+        self.fill_chunk(bytes);
+    }
+
+    pub fn finalize(&mut self) -> Tree {
+        self.end_chunk(true);
+        let mut right = self.stack.pop().unwrap();
+        while !self.stack.is_empty() {
+            let left = self.stack.pop().unwrap();
+            let is_root = self.stack.is_empty();
+            let hash = blake3::guts::parent_cv(left.hash(), right.hash(), is_root);
+            let offset = left.range().offset();
+            let length = left.range().length() + right.range().length();
+            let range = Range { offset, length };
+            right = Tree {
+                range,
+                is_root,
+                hash,
+                children: Children::Tree(Box::new((left, right))),
+            }
+        }
+        right
+    }
+}
+
+pub fn tree_hash(bytes: &[u8]) -> Tree {
+    let mut hasher = TreeHasher::new();
+    hasher.update(bytes);
+    hasher.finalize()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -475,14 +552,26 @@ mod tests {
     }
 
     #[test]
-    fn test_hash_matches() {
+    fn test_tree_hasher() {
+        let buf = [0x42; 65537];
+        for &case in TEST_CASES {
+            dbg!(case);
+            let bytes = &buf[..(case as _)];
+            let hash = blake3::hash(bytes);
+            let tree = tree_hash(bytes);
+            assert_eq!(*tree.hash(), hash);
+        }
+    }
+
+    #[test]
+    fn test_tree() {
         let buf = [0x42; 65537];
         for &case in TEST_CASES {
             dbg!(case);
             let bytes = &buf[..(case as _)];
             let mut buffer = vec![];
             let (bao_bytes, bao_hash) = bao::encode::encode(bytes);
-            let tree = Node::new(bytes);
+            let tree = tree_hash(bytes);
             //dbg!(&tree);
             assert_eq!(tree.hash(), &bao_hash);
             assert!(tree.complete());
@@ -490,7 +579,7 @@ mod tests {
             assert_eq!(tree.ranges(), vec![tree.range]);
             assert_eq!(tree.missing_ranges(), vec![]);
 
-            let mut tree2 = Node::root(*tree.hash(), tree.range().length());
+            let mut tree2 = Tree::new(*tree.hash(), tree.range().length());
             assert_eq!(tree2.hash(), &bao_hash);
             assert!(!tree2.complete());
             assert_eq!(tree2.length(), None);
@@ -529,7 +618,7 @@ mod tests {
                 assert_eq!(right_slice, right_slice2);
 
                 buffer.clear();
-                let mut tree2 = Node::root(*tree.hash(), tree.range().length());
+                let mut tree2 = Tree::new(*tree.hash(), tree.range().length());
 
                 tree2
                     .decode_range(left_range, &left_slice, &mut Cursor::new(&mut buffer))
