@@ -72,7 +72,10 @@ impl Range {
     }
 
     pub fn intersects(&self, other: &Range) -> bool {
-        !(self.end() <= other.offset() || self.offset() >= other.end())
+        // easier to write down when it does not intersect and invert
+        // !(self.end() <= other.offset() || self.offset() >= other.end())
+        // and use boolean algebra to simplify expression
+        self.end() > other.offset() && self.offset() < other.end()
     }
 }
 
@@ -289,11 +292,17 @@ impl Node {
     }
 
     fn inner_ranges(&self, ranges: &mut Vec<Range>) {
-        if self.complete() {
-            ranges.push(self.range);
-        } else if let Some((left, right)) = self.children.as_deref() {
+        if let Some((left, right)) = self.children.as_deref() {
             left.inner_ranges(ranges);
             right.inner_ranges(ranges);
+        } else if self.children == Children::Data {
+            if let Some(last) = ranges.last_mut() {
+                if last.end() == self.range.offset() {
+                    last.length += self.range.length();
+                    return;
+                }
+            }
+            ranges.push(self.range);
         }
     }
 
@@ -308,6 +317,12 @@ impl Node {
             left.inner_missing_ranges(ranges);
             right.inner_missing_ranges(ranges);
         } else if self.children == Children::None {
+            if let Some(last) = ranges.last_mut() {
+                if last.end() == self.range.offset() {
+                    last.length += self.range.length();
+                    return;
+                }
+            }
             ranges.push(self.range);
         }
     }
