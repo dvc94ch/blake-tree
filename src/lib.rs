@@ -1,5 +1,6 @@
 use anyhow::Result;
 use blake3::Hash;
+use std::io::{Read, Seek, SeekFrom, Write};
 
 pub const CHUNK_SIZE: u64 = 1024;
 
@@ -72,10 +73,20 @@ impl Range {
     }
 
     pub fn intersects(&self, other: &Range) -> bool {
+        self == other ||
         // easier to write down when it does not intersect and invert
         // !(self.end() <= other.offset() || self.offset() >= other.end())
         // and use boolean algebra to simplify expression
         self.end() > other.offset() && self.offset() < other.end()
+    }
+
+    pub fn encoded_size(&self) -> u64 {
+        const HEADER_SIZE: u64 = 8;
+        const PARENT_SIZE: u64 = 32 * 2;
+        let num_chunks = self.num_chunks();
+        // num parents always one less than num chunks
+        let num_parents = num_chunks - 1;
+        HEADER_SIZE + PARENT_SIZE * num_parents + CHUNK_SIZE * num_chunks
     }
 }
 
@@ -213,84 +224,6 @@ impl Node {
         }
     }
 
-    pub fn extract(&self, range: &Range) -> Option<Self> {
-        let mut node = Node {
-            range: self.range,
-            is_root: self.is_root,
-            hash: self.hash,
-            children: Children::None,
-        };
-        let intersects = self.range.intersects(range);
-        if self.is_chunk() {
-            if intersects {
-                node.children = Children::Data;
-            }
-            return Some(node);
-        }
-        let (left, right) = self.children.as_deref()?;
-        if intersects {
-            let left = left.extract(range)?;
-            let right = right.extract(range)?;
-            node.children = Children::Tree(Box::new((left, right)));
-        }
-        Some(node)
-    }
-
-    fn inner_verify(&mut self, other: &Self, offset: u64, bytes: &[u8]) -> Result<()> {
-        anyhow::ensure!(self.is_root() == other.is_root());
-        anyhow::ensure!(self.range() == other.range());
-        anyhow::ensure!(self.hash() == other.hash());
-        if self.is_chunk() {
-            if self.children == Children::None && other.children != Children::None {
-                let start = (self.range().offset() - offset) as usize;
-                let end = (self.range().end() - offset) as usize;
-                anyhow::ensure!(bytes.len() >= start);
-                anyhow::ensure!(bytes.len() >= end);
-                let hash = blake3::guts::ChunkState::new(self.range().index())
-                    .update(&bytes[start..end])
-                    .finalize(self.is_root());
-                anyhow::ensure!(self.hash() == &hash);
-                self.children = Children::Data;
-            }
-        } else {
-            let (left_range, right_range) = self.range().split().unwrap();
-            let (other_left, other_right) = if let Some((left, right)) = other.children.as_deref() {
-                (left, right)
-            } else {
-                return Ok(());
-            };
-
-            if self.children == Children::None {
-                let hash =
-                    blake3::guts::parent_cv(other_left.hash(), other_right.hash(), self.is_root());
-                anyhow::ensure!(self.hash() == &hash);
-
-                let left = Node {
-                    range: left_range,
-                    is_root: false,
-                    hash: *other_left.hash(),
-                    children: Children::None,
-                };
-                let right = Node {
-                    range: right_range,
-                    is_root: false,
-                    hash: *other_right.hash(),
-                    children: Children::None,
-                };
-                self.children = Children::Tree(Box::new((left, right)));
-            }
-
-            let (left, right) = self.children.as_deref_mut().unwrap();
-            left.inner_verify(other_left, offset, bytes)?;
-            right.inner_verify(other_right, offset, bytes)?;
-        }
-        Ok(())
-    }
-
-    pub fn verify(&mut self, other: &Self, bytes: &[u8]) -> Result<()> {
-        self.inner_verify(other, other.ranges()[0].offset(), bytes)
-    }
-
     fn inner_ranges(&self, ranges: &mut Vec<Range>) {
         if let Some((left, right)) = self.children.as_deref() {
             left.inner_ranges(ranges);
@@ -333,18 +266,150 @@ impl Node {
         ranges
     }
 
-    pub fn encode(&self) -> Vec<u8> {
-        todo!()
+    fn inner_encode_range_to(
+        &self,
+        range: &Range,
+        tree: &mut impl Write,
+        chunks: &mut (impl Read + Seek),
+    ) -> Result<()> {
+        if self.is_chunk() {
+            if range.intersects(self.range()) {
+                if self.children == Children::Data {
+                    let chunk = &mut [0; 1024][..self.range.length() as _];
+                    chunks.seek(SeekFrom::Start(self.range.offset()))?;
+                    chunks.read_exact(chunk)?;
+                    tree.write_all(chunk)?;
+                } else {
+                    anyhow::bail!("missing chunk");
+                }
+            }
+        } else if let Some((left, right)) = self.children.as_deref() {
+            tree.write_all(left.hash().as_bytes())?;
+            tree.write_all(right.hash().as_bytes())?;
+            if range.intersects(left.range()) {
+                left.inner_encode_range_to(range, tree, chunks)?;
+            }
+            if range.intersects(right.range()) {
+                right.inner_encode_range_to(range, tree, chunks)?;
+            }
+        } else {
+            anyhow::bail!("missing node");
+        }
+        Ok(())
     }
 
-    pub fn decode(_bytes: &[u8]) -> Result<Self> {
-        todo!()
+    pub fn encode_range_to(
+        &self,
+        range: &Range,
+        tree: &mut impl Write,
+        chunks: &mut (impl Read + Seek),
+    ) -> Result<()> {
+        anyhow::ensure!(self.is_root);
+        let length = self.range().length();
+        tree.write_all(&length.to_le_bytes()[..])?;
+        self.inner_encode_range_to(range, tree, chunks)
+    }
+
+    pub fn encode_range(&self, range: &Range, chunks: &mut (impl Read + Seek)) -> Vec<u8> {
+        let mut tree = Vec::with_capacity(range.encoded_size() as _);
+        self.encode_range_to(range, &mut tree, chunks).unwrap();
+        tree
+    }
+
+    pub fn encode(&self, chunks: &mut (impl Read + Seek)) -> Vec<u8> {
+        self.encode_range(self.range(), chunks)
+    }
+
+    fn inner_decode_range_from(
+        &mut self,
+        range: Range,
+        tree: &mut impl Read,
+        chunks: &mut (impl Write + Seek),
+    ) -> Result<()> {
+        if self.is_chunk() {
+            if self.children == Children::None && range.intersects(self.range()) {
+                let chunk = &mut [0; 1024][..self.range.length() as _];
+                tree.read_exact(chunk)?;
+                let hash = blake3::guts::ChunkState::new(self.range.index())
+                    .update(chunk)
+                    .finalize(self.is_root);
+                anyhow::ensure!(*self.hash() == hash);
+                chunks.seek(SeekFrom::Start(self.range().offset()))?;
+                chunks.write_all(chunk)?;
+                self.children = Children::Data;
+            }
+        } else {
+            let mut left_hash = [0; 32];
+            tree.read_exact(&mut left_hash)?;
+            let left_hash = Hash::from(left_hash);
+
+            let mut right_hash = [0; 32];
+            tree.read_exact(&mut right_hash)?;
+            let right_hash = Hash::from(right_hash);
+
+            let hash = blake3::guts::parent_cv(&left_hash, &right_hash, self.is_root);
+            anyhow::ensure!(*self.hash() == hash);
+
+            if self.children == Children::None {
+                let (left_range, right_range) = self.range().split().unwrap();
+                let left = Self {
+                    is_root: false,
+                    hash: left_hash,
+                    range: left_range,
+                    children: Children::None,
+                };
+                let right = Self {
+                    is_root: false,
+                    hash: right_hash,
+                    range: right_range,
+                    children: Children::None,
+                };
+                self.children = Children::Tree(Box::new((left, right)));
+            }
+            let (left, right) = self.children.as_deref_mut().unwrap();
+            if range.intersects(left.range()) {
+                left.inner_decode_range_from(range, tree, chunks)?;
+            }
+            if range.intersects(right.range()) {
+                right.inner_decode_range_from(range, tree, chunks)?;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn decode_range_from(
+        &mut self,
+        range: Range,
+        tree: &mut impl Read,
+        chunks: &mut (impl Write + Seek),
+    ) -> Result<()> {
+        anyhow::ensure!(self.is_root);
+        let mut length = [0; 8];
+        tree.read_exact(&mut length)?;
+        let length = u64::from_le_bytes(length);
+        anyhow::ensure!(self.range == Range::new(length));
+        self.inner_decode_range_from(range, tree, chunks)
+    }
+
+    pub fn decode_range(
+        &mut self,
+        range: Range,
+        mut tree: &[u8],
+        chunks: &mut (impl Write + Seek),
+    ) -> Result<()> {
+        self.decode_range_from(range, &mut tree, chunks)
+    }
+
+    pub fn decode(&mut self, tree: &[u8], chunks: &mut (impl Write + Seek)) -> Result<()> {
+        self.decode_range(self.range, tree, chunks)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bao::encode::SliceExtractor;
+    use std::io::Cursor;
 
     // Interesting input lengths to run tests on.
     pub const TEST_CASES: &[u64] = &[
@@ -372,56 +437,114 @@ mod tests {
     ];
 
     #[test]
+    fn test_intersects() {
+        let ranges = [
+            ((0, 0), (0, 0)),
+            ((2, 5), (1, 6)),
+            ((2, 5), (3, 4)),
+            ((2, 4), (3, 5)),
+            ((3, 5), (2, 4)),
+        ];
+        for ((a, b), (c, d)) in ranges {
+            let a = Range {
+                offset: a,
+                length: b,
+            };
+            let b = Range {
+                offset: c,
+                length: d,
+            };
+            assert!(a.intersects(&b));
+        }
+    }
+
+    #[test]
+    fn test_doesnt_intersect() {
+        let ranges = [((0, 0), (1, 0)), ((0, 1), (2, 1)), ((2, 5), (0, 1))];
+        for ((a, b), (c, d)) in ranges {
+            let a = Range {
+                offset: a,
+                length: b,
+            };
+            let b = Range {
+                offset: c,
+                length: d,
+            };
+            assert!(!a.intersects(&b));
+        }
+    }
+
+    #[test]
     fn test_hash_matches() {
         let buf = [0x42; 65537];
         for &case in TEST_CASES {
             dbg!(case);
             let bytes = &buf[..(case as _)];
-            let expected = blake3::hash(bytes);
+            let mut buffer = vec![];
+            let (bao_bytes, bao_hash) = bao::encode::encode(bytes);
             let tree = Node::new(bytes);
             //dbg!(&tree);
-            assert_eq!(tree.hash(), &expected);
+            assert_eq!(tree.hash(), &bao_hash);
             assert!(tree.complete());
             assert_eq!(tree.length(), Some(case));
             assert_eq!(tree.ranges(), vec![tree.range]);
             assert_eq!(tree.missing_ranges(), vec![]);
 
             let mut tree2 = Node::root(*tree.hash(), tree.range().length());
-            assert_eq!(tree2.hash(), &expected);
+            assert_eq!(tree2.hash(), &bao_hash);
             assert!(!tree2.complete());
             assert_eq!(tree2.length(), None);
             assert_eq!(tree2.ranges(), vec![]);
             assert_eq!(tree2.missing_ranges(), vec![tree.range]);
 
-            tree2.verify(&tree, bytes).unwrap();
+            let slice = tree.encode(&mut Cursor::new(bytes));
+            assert!(slice.len() as u64 <= tree.range().encoded_size());
+            assert_eq!(bao_bytes, slice);
+            buffer.clear();
+            tree2.decode(&slice, &mut Cursor::new(&mut buffer)).unwrap();
             assert_eq!(tree2, tree);
+            assert_eq!(bytes, buffer);
 
-            if let Some((left, right)) = tree.range().split() {
-                let (left_bytes, right_bytes) = buf.split_at(left.end() as _);
+            if let Some((left_range, right_range)) = tree.range().split() {
+                let left_slice = tree.encode_range(&left_range, &mut Cursor::new(bytes));
+                let mut left_slice2 = vec![];
+                SliceExtractor::new(
+                    Cursor::new(&bao_bytes),
+                    left_range.offset(),
+                    left_range.length(),
+                )
+                .read_to_end(&mut left_slice2)
+                .unwrap();
+                assert_eq!(left_slice, left_slice2);
 
-                dbg!(left);
-                let left_tree = tree.extract(&left).unwrap();
-                dbg!(&left_tree);
-                assert_eq!(left_tree.hash(), &expected);
-                assert!(!left_tree.complete());
-                assert_eq!(left_tree.length(), None);
-                assert_eq!(left_tree.ranges(), vec![left]);
-                assert_eq!(left_tree.missing_ranges(), vec![right]);
+                let right_slice = tree.encode_range(&right_range, &mut Cursor::new(bytes));
+                let mut right_slice2 = vec![];
+                SliceExtractor::new(
+                    Cursor::new(&bao_bytes),
+                    right_range.offset(),
+                    right_range.length(),
+                )
+                .read_to_end(&mut right_slice2)
+                .unwrap();
+                assert_eq!(right_slice, right_slice2);
 
-                dbg!(right);
-                let right_tree = tree.extract(&right).unwrap();
-                dbg!(&right_tree);
-                assert_eq!(right_tree.hash(), &expected);
-                assert!(!right_tree.complete());
-                assert_eq!(right_tree.length(), Some(case));
-                assert_eq!(right_tree.ranges(), vec![right]);
-                assert_eq!(right_tree.missing_ranges(), vec![left]);
-
+                buffer.clear();
                 let mut tree2 = Node::root(*tree.hash(), tree.range().length());
-                tree2.verify(&left_tree, left_bytes).unwrap();
-                assert_eq!(tree2, left_tree);
-                tree2.verify(&right_tree, right_bytes).unwrap();
+
+                tree2
+                    .decode_range(left_range, &left_slice, &mut Cursor::new(&mut buffer))
+                    .unwrap();
+                assert_eq!(tree2.hash(), &bao_hash);
+                assert!(!tree2.complete());
+                assert_eq!(tree2.length(), None);
+                assert_eq!(tree2.ranges(), vec![left_range]);
+                assert_eq!(tree2.missing_ranges(), vec![right_range]);
+
+                tree2
+                    .decode_range(right_range, &right_slice, &mut Cursor::new(&mut buffer))
+                    .unwrap();
                 assert_eq!(tree2, tree);
+                assert_eq!(bytes, buffer);
             }
         }
     }
