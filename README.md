@@ -16,13 +16,13 @@ fn main() -> Result<()> {
     let mut chunks = BufWriter::new(File::create(path2)?);
     let mut tree2 = Tree::new(*tree.hash(), tree.length().unwrap());
     tree2.decode_range(range, &slice, &mut chunks)?;
+    chunks.flush()?;
 
-    let mut chunks = BufReader::new(File::open(path)?);
+    let mut chunks = BufReader::new(File::open(path2)?);
     chunks.seek(SeekFrom::Start(range.offset()))?;
     let mut chunk = [0; 1024];
     chunks.read_exact(&mut chunk)?;
     assert_eq!(chunk, [0x42; 1024]);
-
     Ok(())
 }
 ```
