@@ -11,8 +11,9 @@ pub struct Range {
 }
 
 impl Range {
-    pub fn new(length: u64) -> Self {
-        Self { offset: 0, length }
+    pub fn new(offset: u64, length: u64) -> Self {
+        //debug_assert!(offset % CHUNK_SIZE == 0);
+        Self { offset, length }
     }
 
     pub fn offset(&self) -> u64 {
@@ -47,14 +48,8 @@ impl Range {
         assert!(i > 0);
         let at = i * CHUNK_SIZE;
         if self.length > at {
-            let first = Range {
-                offset: self.offset,
-                length: at,
-            };
-            let second = Range {
-                offset: self.offset + at,
-                length: self.length - at,
-            };
+            let first = Range::new(self.offset, at);
+            let second = Range::new(self.offset + at, self.length - at);
             Some((first, second))
         } else {
             None
@@ -134,7 +129,7 @@ pub struct Tree {
 impl Tree {
     pub fn new(hash: Hash, length: u64) -> Self {
         Self {
-            range: Range::new(length),
+            range: Range::new(0, length),
             is_root: true,
             hash,
             children: Children::None,
@@ -355,7 +350,7 @@ impl Tree {
         let mut length = [0; 8];
         tree.read_exact(&mut length)?;
         let length = u64::from_le_bytes(length);
-        anyhow::ensure!(self.range == Range::new(length));
+        anyhow::ensure!(self.range == Range::new(0, length));
         self.inner_decode_range_from(range, tree, chunks)
     }
 
@@ -409,10 +404,10 @@ impl TreeHasher {
 
     fn end_chunk(&mut self, finalize: bool) {
         let is_root = finalize && self.stack.is_empty();
-        let range = Range {
-            offset: self.length - self.chunk_length as u64,
-            length: self.chunk_length as _,
-        };
+        let range = Range::new(
+            self.length - self.chunk_length as u64,
+            self.chunk_length as _,
+        );
         let hash = blake3::guts::ChunkState::new(range.index())
             .update(&self.chunk[..self.chunk_length])
             .finalize(is_root);
@@ -432,7 +427,7 @@ impl TreeHasher {
             let hash = blake3::guts::parent_cv(left.hash(), right.hash(), is_root);
             let offset = left.range().offset();
             let length = left.range().length() + right.range().length();
-            let range = Range { offset, length };
+            let range = Range::new(offset, length);
             right = Tree {
                 range,
                 is_root,
@@ -464,7 +459,7 @@ impl TreeHasher {
             let hash = blake3::guts::parent_cv(left.hash(), right.hash(), is_root);
             let offset = left.range().offset();
             let length = left.range().length() + right.range().length();
-            let range = Range { offset, length };
+            let range = Range::new(offset, length);
             right = Tree {
                 range,
                 is_root,
@@ -473,6 +468,17 @@ impl TreeHasher {
             }
         }
         right
+    }
+}
+
+impl Write for TreeHasher {
+    fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+        self.update(buffer);
+        Ok(buffer.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
     }
 }
 
@@ -486,7 +492,8 @@ pub fn tree_hash(bytes: &[u8]) -> Tree {
 mod tests {
     use super::*;
     use bao::encode::SliceExtractor;
-    use std::io::Cursor;
+    use std::fs::File;
+    use std::io::{BufReader, BufWriter, Cursor};
 
     // Interesting input lengths to run tests on.
     pub const TEST_CASES: &[u64] = &[
@@ -523,14 +530,8 @@ mod tests {
             ((3, 5), (2, 4)),
         ];
         for ((a, b), (c, d)) in ranges {
-            let a = Range {
-                offset: a,
-                length: b,
-            };
-            let b = Range {
-                offset: c,
-                length: d,
-            };
+            let a = Range::new(a, b);
+            let b = Range::new(c, d);
             assert!(a.intersects(&b));
         }
     }
@@ -539,14 +540,8 @@ mod tests {
     fn test_doesnt_intersect() {
         let ranges = [((0, 0), (1, 0)), ((0, 1), (2, 1)), ((2, 5), (0, 1))];
         for ((a, b), (c, d)) in ranges {
-            let a = Range {
-                offset: a,
-                length: b,
-            };
-            let b = Range {
-                offset: c,
-                length: d,
-            };
+            let a = Range::new(a, b);
+            let b = Range::new(c, d);
             assert!(!a.intersects(&b));
         }
     }
@@ -636,5 +631,30 @@ mod tests {
                 assert_eq!(bytes, buffer);
             }
         }
+    }
+
+    #[test]
+    fn test_example() -> Result<()> {
+        let path = "/tmp/file";
+        let path2 = "/tmp/file2";
+        std::fs::write(path, &[0x42; 2049][..])?;
+        let range = Range::new(1024, 1024);
+
+        let mut chunks = BufReader::new(File::open(path)?);
+        let mut hasher = TreeHasher::new();
+        std::io::copy(&mut chunks, &mut hasher)?;
+        let tree = hasher.finalize();
+        let slice = tree.encode_range(&range, &mut chunks);
+
+        let mut chunks = BufWriter::new(File::create(path2)?);
+        let mut tree2 = Tree::new(*tree.hash(), tree.length().unwrap());
+        tree2.decode_range(range, &slice, &mut chunks)?;
+
+        let mut chunks = BufReader::new(File::open(path)?);
+        chunks.seek(SeekFrom::Start(range.offset()))?;
+        let mut chunk = [0; 1024];
+        chunks.read_exact(&mut chunk)?;
+        assert_eq!(chunk, [0x42; 1024]);
+        Ok(())
     }
 }
