@@ -1,12 +1,14 @@
 mod hasher;
 mod mime;
 mod range;
+mod store;
 mod stream_id;
 mod tree;
 
 pub use crate::hasher::{tree_hash, TreeHasher};
 pub use crate::mime::{Mime, MimeType};
 pub use crate::range::Range;
+pub use crate::store::{StreamHasher, StreamReader, StreamSlicer, StreamStorage, StreamWriter};
 pub use crate::stream_id::StreamId;
 pub use crate::tree::Tree;
 pub use anyhow::Result;

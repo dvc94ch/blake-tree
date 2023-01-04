@@ -56,7 +56,7 @@ impl TreeHasher {
             let offset = left.range().offset();
             let length = left.range().length() + right.range().length();
             let range = Range::new(offset, length);
-            right = Tree::tree(hash, range, is_root, left, right);
+            right = Tree::subtree(hash, range, is_root, left, right);
             total_chunks >>= 1;
         }
         self.stack.push(right);
@@ -83,7 +83,7 @@ impl TreeHasher {
             let offset = left.range().offset();
             let length = left.range().length() + right.range().length();
             let range = Range::new(offset, length);
-            right = Tree::tree(hash, range, is_root, left, right);
+            right = Tree::subtree(hash, range, is_root, left, right);
         }
         right
     }

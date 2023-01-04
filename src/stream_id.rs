@@ -66,7 +66,7 @@ impl StreamId {
 
 impl std::fmt::Debug for StreamId {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "StreamId({})", self)
+        write!(f, "StreamId({self})")
     }
 }
 

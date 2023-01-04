@@ -55,7 +55,7 @@ impl Tree {
         }
     }
 
-    pub(crate) fn tree(hash: Hash, range: Range, is_root: bool, left: Tree, right: Tree) -> Self {
+    pub(crate) fn subtree(hash: Hash, range: Range, is_root: bool, left: Tree, right: Tree) -> Self {
         Self {
             hash,
             range,
@@ -113,6 +113,16 @@ impl Tree {
         } else {
             None
         }
+    }
+
+    pub fn has_range(&self, range: &Range) -> bool {
+        if self.children == Children::None && range.intersects(self.range()) {
+            return false;
+        }
+        if let Some((left, right)) = self.children.as_deref() {
+            return left.has_range(range) && right.has_range(range);
+        }
+        true
     }
 
     fn inner_ranges(&self, ranges: &mut Vec<Range>) {
