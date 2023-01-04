@@ -1,9 +1,11 @@
 mod hasher;
+mod mime;
 mod range;
 mod stream_id;
 mod tree;
 
 pub use crate::hasher::{tree_hash, TreeHasher};
+pub use crate::mime::{Mime, MimeType};
 pub use crate::range::Range;
 pub use crate::stream_id::StreamId;
 pub use crate::tree::Tree;
