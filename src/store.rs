@@ -1,4 +1,5 @@
-use crate::{Mime, Range, Result, StreamId, Tree, TreeHasher};
+use crate::{Mime, Range, Result, StreamId, Tree, TreeHasher, TreeStorage};
+use anyhow::Context;
 use std::fs::File;
 use std::io::{self, BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
@@ -10,9 +11,9 @@ pub struct StreamHasher {
 }
 
 impl StreamHasher {
-    fn new(path: PathBuf) -> Result<Self> {
+    fn new(storage: TreeStorage, path: PathBuf) -> Result<Self> {
         let chunks = BufWriter::new(File::create(&path)?);
-        let hasher = TreeHasher::new();
+        let hasher = TreeHasher::new(storage);
         Ok(Self {
             path,
             chunks,
@@ -22,8 +23,8 @@ impl StreamHasher {
 
     pub fn finalize(mut self, mime: Mime) -> Result<StreamId> {
         self.flush()?;
-        let tree = self.hasher.finalize();
-        let id = StreamId::new(*tree.hash(), tree.length().unwrap(), mime as _);
+        let tree = self.hasher.finalize()?;
+        let id = StreamId::new(*tree.hash(), tree.length()?.unwrap(), mime as _);
         let bytes64 = id.to_base64();
         let name = std::str::from_utf8(&bytes64).unwrap();
         let final_path = self.path.parent().unwrap().join(name);
@@ -78,14 +79,13 @@ impl StreamWriter {
     }
 
     pub fn write_range_from(&mut self, range: &Range, from: &mut impl Read) -> Result<()> {
-        self.tree
-            .decode_range_from(*range, from, &mut self.chunks)?;
+        self.tree.decode_range_from(range, from, &mut self.chunks)?;
         self.chunks.flush()?;
         Ok(())
     }
 
     pub fn write_range(&mut self, range: &Range, slice: &[u8]) -> Result<()> {
-        self.tree.decode_range(*range, slice, &mut self.chunks)?;
+        self.tree.decode_range(range, slice, &mut self.chunks)?;
         self.chunks.flush()?;
         Ok(())
     }
@@ -99,7 +99,7 @@ pub struct StreamReader {
 
 impl StreamReader {
     fn new(path: &Path, tree: Tree, range: Range) -> Result<Self> {
-        anyhow::ensure!(tree.has_range(&range));
+        anyhow::ensure!(tree.has_range(&range)?);
         let chunks = BufReader::new(File::open(path)?);
         Ok(Self {
             chunks,
@@ -109,7 +109,7 @@ impl StreamReader {
     }
 
     pub fn set_range(&mut self, range: Range) -> Result<()> {
-        anyhow::ensure!(self.tree.has_range(&range));
+        anyhow::ensure!(self.tree.has_range(&range)?);
         self.range = range;
         Ok(())
     }
@@ -140,20 +140,25 @@ impl Seek for StreamReader {
 }
 
 pub struct StreamStorage {
-    path: PathBuf,
+    chunks: PathBuf,
+    storage: TreeStorage,
 }
 
 impl StreamStorage {
     pub fn new(path: PathBuf) -> Result<Self> {
-        std::fs::create_dir_all(&path)?;
-        Ok(Self { path })
+        let chunks = path.join("chunks");
+        std::fs::create_dir_all(&chunks)?;
+        let db = sled::open(path.join("trees"))?;
+        let tree = db.open_tree("trees")?;
+        let storage = TreeStorage::new(tree);
+        Ok(Self { chunks, storage })
     }
 
     fn stream_path(&self, id: StreamId) -> PathBuf {
         let bytes64 = id.to_base64();
         let name = std::str::from_utf8(&bytes64).unwrap();
-        let mut path = PathBuf::with_capacity(self.path.as_os_str().len() + bytes64.len() + 1);
-        path.push(&self.path);
+        let mut path = PathBuf::with_capacity(self.chunks.as_os_str().len() + bytes64.len() + 1);
+        path.push(&self.chunks);
         path.push(name);
         path
     }
@@ -165,20 +170,28 @@ impl StreamStorage {
             "tmp_{:x}{:x}{:x}{:x}{:x}{:x}{:x}{:x}",
             b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]
         );
-        self.path.join(name)
+        self.chunks.join(name)
+    }
+
+    pub fn streams(&self) -> impl Iterator<Item = Result<StreamId>> {
+        // TODO:
+        std::iter::empty()
     }
 
     pub fn contains(&self, id: StreamId) -> bool {
+        // TODO: use db
         self.stream_path(id).exists()
     }
 
     pub fn remove(&self, id: StreamId) -> Result<()> {
+        // TODO: remove tree
         std::fs::remove_file(self.stream_path(id))?;
         Ok(())
     }
 
     pub fn hasher(&self) -> Result<StreamHasher> {
-        StreamHasher::new(self.temp_path())
+        // TODO: handle failure
+        StreamHasher::new(self.storage.clone(), self.temp_path())
     }
 
     pub fn add(&self, path: &Path) -> Result<StreamId> {
@@ -190,20 +203,17 @@ impl StreamStorage {
     }
 
     pub fn reader(&self, id: StreamId, range: Range) -> Result<StreamReader> {
-        // TODO
-        let tree = Tree::new(id.hash(), id.length());
+        let tree = self.storage.get(id.hash())?.context("missing stream")?;
         StreamReader::new(&self.stream_path(id), tree, range)
     }
 
     pub fn writer(&self, id: StreamId) -> Result<StreamWriter> {
-        // TODO
-        let tree = Tree::new(id.hash(), id.length());
+        let tree = self.storage.get(id.hash())?.context("missing stream")?;
         StreamWriter::new(&self.stream_path(id), tree)
     }
 
     pub fn slicer(&self, id: StreamId) -> Result<StreamSlicer> {
-        // TODO
-        let tree = Tree::new(id.hash(), id.length());
+        let tree = self.storage.get(id.hash())?.context("missing stream")?;
         StreamSlicer::new(&self.stream_path(id), tree)
     }
 }

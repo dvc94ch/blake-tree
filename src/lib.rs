@@ -10,7 +10,7 @@ pub use crate::mime::{Mime, MimeType};
 pub use crate::range::Range;
 pub use crate::store::{StreamHasher, StreamReader, StreamSlicer, StreamStorage, StreamWriter};
 pub use crate::stream_id::StreamId;
-pub use crate::tree::Tree;
+pub use crate::tree::{Tree, TreeStorage};
 pub use anyhow::Result;
 pub use blake3::Hash;
 

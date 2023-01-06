@@ -1,8 +1,9 @@
-use crate::{Range, Tree, CHUNK_SIZE};
+use crate::{Range, Result, Tree, TreeStorage, CHUNK_SIZE};
 use std::io::Write;
 
 #[derive(Clone)]
 pub struct TreeHasher {
+    storage: TreeStorage,
     stack: Vec<Tree>,
     chunk: [u8; 1024],
     chunk_length: usize,
@@ -10,21 +11,16 @@ pub struct TreeHasher {
     chunks: usize,
 }
 
-impl Default for TreeHasher {
-    fn default() -> Self {
+impl TreeHasher {
+    pub fn new(storage: TreeStorage) -> Self {
         Self {
+            storage,
             stack: vec![],
             chunk: [0; 1024],
             chunk_length: 0,
             length: 0,
             chunks: 0,
         }
-    }
-}
-
-impl TreeHasher {
-    pub fn new() -> Self {
-        Self::default()
     }
 
     fn fill_chunk(&mut self, bytes: &[u8]) {
@@ -35,7 +31,7 @@ impl TreeHasher {
         self.length += bytes.len() as u64;
     }
 
-    fn end_chunk(&mut self, finalize: bool) {
+    fn end_chunk(&mut self, finalize: bool) -> Result<()> {
         let is_root = finalize && self.stack.is_empty();
         let range = Range::new(
             self.length - self.chunk_length as u64,
@@ -44,7 +40,7 @@ impl TreeHasher {
         let hash = blake3::guts::ChunkState::new(range.index())
             .update(&self.chunk[..self.chunk_length])
             .finalize(is_root);
-        let mut right = Tree::chunk(hash, range, is_root);
+        let mut right = Tree::chunk(self.storage.clone(), hash, range, is_root)?;
         self.chunks += 1;
         self.chunk_length = 0;
 
@@ -56,25 +52,34 @@ impl TreeHasher {
             let offset = left.range().offset();
             let length = left.range().length() + right.range().length();
             let range = Range::new(offset, length);
-            right = Tree::subtree(hash, range, is_root, left, right);
+            right = Tree::subtree(
+                self.storage.clone(),
+                hash,
+                range,
+                is_root,
+                *left.hash(),
+                *right.hash(),
+            )?;
             total_chunks >>= 1;
         }
         self.stack.push(right);
+        Ok(())
     }
 
-    pub fn update(&mut self, mut bytes: &[u8]) {
+    pub fn update(&mut self, mut bytes: &[u8]) -> Result<()> {
         let split = CHUNK_SIZE as usize - self.chunk_length;
         while split < bytes.len() as _ {
             let (chunk, rest) = bytes.split_at(split);
             self.fill_chunk(chunk);
             bytes = rest;
-            self.end_chunk(false);
+            self.end_chunk(false)?;
         }
         self.fill_chunk(bytes);
+        Ok(())
     }
 
-    pub fn finalize(&mut self) -> Tree {
-        self.end_chunk(true);
+    pub fn finalize(&mut self) -> Result<Tree> {
+        self.end_chunk(true)?;
         let mut right = self.stack.pop().unwrap();
         while !self.stack.is_empty() {
             let left = self.stack.pop().unwrap();
@@ -83,15 +88,23 @@ impl TreeHasher {
             let offset = left.range().offset();
             let length = left.range().length() + right.range().length();
             let range = Range::new(offset, length);
-            right = Tree::subtree(hash, range, is_root, left, right);
+            right = Tree::subtree(
+                self.storage.clone(),
+                hash,
+                range,
+                is_root,
+                *left.hash(),
+                *right.hash(),
+            )?;
         }
-        right
+        Ok(right)
     }
 }
 
 impl Write for TreeHasher {
     fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
-        self.update(buffer);
+        self.update(buffer)
+            .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err.to_string()))?;
         Ok(buffer.len())
     }
 
@@ -100,9 +113,9 @@ impl Write for TreeHasher {
     }
 }
 
-pub fn tree_hash(bytes: &[u8]) -> Tree {
-    let mut hasher = TreeHasher::new();
-    hasher.update(bytes);
+pub fn tree_hash(storage: TreeStorage, bytes: &[u8]) -> Result<Tree> {
+    let mut hasher = TreeHasher::new(storage);
+    hasher.update(bytes)?;
     hasher.finalize()
 }
 

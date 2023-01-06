@@ -18,8 +18,8 @@ impl StreamId {
         Self { hash, length, mime }
     }
 
-    pub fn hash(self) -> Hash {
-        self.hash
+    pub fn hash(&self) -> &Hash {
+        &self.hash
     }
 
     pub fn length(self) -> u64 {

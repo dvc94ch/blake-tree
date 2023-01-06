@@ -1,43 +1,68 @@
 use crate::{Hash, Range, Result};
 use std::io::{Read, Seek, SeekFrom, Write};
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone)]
+pub struct TreeStorage {
+    tree: sled::Tree,
+}
+
+impl TreeStorage {
+    pub fn new(tree: sled::Tree) -> Self {
+        Self { tree }
+    }
+
+    pub(crate) fn get(&self, _hash: &Hash) -> Result<Option<Tree>> {
+        todo!()
+    }
+
+    fn insert(&self, _tree: &Node) -> Result<()> {
+        todo!()
+    }
+
+    fn insert_children(&self, _hash: &Hash, _left: &Node, _right: &Node) -> Result<()> {
+        todo!()
+    }
+
+    fn set_data(&self, _hash: &Hash) -> Result<()> {
+        todo!()
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Children {
     None,
     Data,
-    Tree(Box<(Tree, Tree)>),
+    Tree(Hash, Hash),
 }
 
 impl Children {
-    fn is_none(&self) -> bool {
-        self == &Self::None
-    }
-
-    fn as_deref(&self) -> Option<&(Tree, Tree)> {
-        match self {
-            Self::Tree(nodes) => Some(&**nodes),
-            _ => None,
+    fn as_chunk(&self) -> Option<()> {
+        if *self == Self::Data {
+            Some(())
+        } else {
+            None
         }
     }
 
-    fn as_deref_mut(&mut self) -> Option<&mut (Tree, Tree)> {
-        match self {
-            Self::Tree(nodes) => Some(&mut **nodes),
-            _ => None,
+    fn as_subtree(&self) -> Option<(&Hash, &Hash)> {
+        if let Self::Tree(left, right) = self {
+            Some((left, right))
+        } else {
+            None
         }
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Tree {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct Node {
     hash: Hash,
     range: Range,
     is_root: bool,
     children: Children,
 }
 
-impl Tree {
-    pub fn new(hash: Hash, length: u64) -> Self {
+impl Node {
+    fn new(hash: Hash, length: u64) -> Self {
         Self {
             range: Range::new(0, length),
             is_root: true,
@@ -46,7 +71,7 @@ impl Tree {
         }
     }
 
-    pub(crate) fn chunk(hash: Hash, range: Range, is_root: bool) -> Self {
+    fn chunk(hash: Hash, range: Range, is_root: bool) -> Self {
         Self {
             hash,
             range,
@@ -55,116 +80,210 @@ impl Tree {
         }
     }
 
-    pub(crate) fn subtree(hash: Hash, range: Range, is_root: bool, left: Tree, right: Tree) -> Self {
+    fn subtree(hash: Hash, range: Range, is_root: bool, left: Hash, right: Hash) -> Self {
         Self {
             hash,
             range,
             is_root,
-            children: Children::Tree(Box::new((left, right))),
+            children: Children::Tree(left, right),
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct Tree {
+    storage: TreeStorage,
+    node: Node,
+}
+
+impl Tree {
+    fn create_node(storage: TreeStorage, node: Node) -> Result<Self> {
+        storage.insert(&node)?;
+        Ok(Self { storage, node })
+    }
+
+    pub fn new(storage: TreeStorage, hash: Hash, length: u64) -> Result<Self> {
+        Self::create_node(storage, Node::new(hash, length))
+    }
+
+    pub(crate) fn chunk(
+        storage: TreeStorage,
+        hash: Hash,
+        range: Range,
+        is_root: bool,
+    ) -> Result<Self> {
+        Self::create_node(storage, Node::chunk(hash, range, is_root))
+    }
+
+    pub(crate) fn subtree(
+        storage: TreeStorage,
+        hash: Hash,
+        range: Range,
+        is_root: bool,
+        left: Hash,
+        right: Hash,
+    ) -> Result<Self> {
+        Self::create_node(storage, Node::subtree(hash, range, is_root, left, right))
     }
 
     pub fn hash(&self) -> &Hash {
-        &self.hash
+        &self.node.hash
     }
 
     pub fn range(&self) -> &Range {
-        &self.range
+        &self.node.range
     }
 
     pub fn is_root(&self) -> bool {
-        self.is_root
+        self.node.is_root
     }
 
     pub fn is_chunk(&self) -> bool {
-        self.range.is_chunk()
+        self.node.range.is_chunk()
     }
 
-    pub fn left(&self) -> Option<&Tree> {
-        self.children.as_deref().map(|(left, _)| left)
+    pub fn is_missing(&self) -> bool {
+        self.node.children == Children::None
     }
 
-    pub fn right(&self) -> Option<&Tree> {
-        self.children.as_deref().map(|(_, right)| right)
+    pub fn as_chunk(&self) -> Option<()> {
+        self.node.children.as_chunk()
     }
 
-    pub fn complete(&self) -> bool {
-        if self.is_chunk() {
-            !self.children.is_none()
-        } else if let Some((left, right)) = self.children.as_deref() {
-            left.complete() && right.complete()
+    pub fn as_subtree(&self) -> Option<(&Hash, &Hash)> {
+        self.node.children.as_subtree()
+    }
+
+    fn set_data(&self) -> Result<()> {
+        self.storage.set_data(self.hash())
+    }
+
+    fn create_children(&self, left: Hash, right: Hash) -> Result<(Tree, Tree)> {
+        let (left_range, right_range) = self.range().split().unwrap();
+        let left = Self {
+            node: Node {
+                is_root: false,
+                hash: left,
+                range: left_range,
+                children: Children::None,
+            },
+            storage: self.storage.clone(),
+        };
+        let right = Self {
+            node: Node {
+                is_root: false,
+                hash: right,
+                range: right_range,
+                children: Children::None,
+            },
+            storage: self.storage.clone(),
+        };
+        self.storage
+            .insert_children(self.hash(), &left.node, &right.node)?;
+        Ok((left, right))
+    }
+
+    pub fn left(&self) -> Result<Option<Tree>> {
+        Ok(if let Some((left, _)) = self.as_subtree() {
+            self.storage.get(left)?
+        } else {
+            None
+        })
+    }
+
+    pub fn right(&self) -> Result<Option<Tree>> {
+        Ok(if let Some((_, right)) = self.as_subtree() {
+            self.storage.get(right)?
+        } else {
+            None
+        })
+    }
+
+    pub fn complete(&self) -> Result<bool> {
+        Ok(if self.as_chunk().is_some() {
+            true
+        } else if let Some((left, right)) = self.as_subtree() {
+            let left = self.storage.get(left)?.unwrap().complete()?;
+            let right = self.storage.get(right)?.unwrap().complete()?;
+            left && right
         } else {
             false
-        }
+        })
     }
 
-    pub fn last_chunk(&self) -> &Tree {
-        if let Some(right) = self.right() {
-            right.last_chunk()
+    pub fn last_chunk(&self) -> Result<Tree> {
+        Ok(if let Some(right) = self.right()? {
+            right.last_chunk()?
         } else {
-            self
-        }
+            self.clone()
+        })
     }
 
-    pub fn length(&self) -> Option<u64> {
-        let last = self.last_chunk();
-        if last.children == Children::Data {
+    pub fn length(&self) -> Result<Option<u64>> {
+        let last = self.last_chunk()?;
+        Ok(if last.as_chunk().is_some() {
             Some(last.range().end())
         } else {
             None
-        }
+        })
     }
 
-    pub fn has_range(&self, range: &Range) -> bool {
-        if self.children == Children::None && range.intersects(self.range()) {
-            return false;
+    pub fn has_range(&self, range: &Range) -> Result<bool> {
+        if self.is_missing() && range.intersects(self.range()) {
+            return Ok(false);
         }
-        if let Some((left, right)) = self.children.as_deref() {
-            return left.has_range(range) && right.has_range(range);
+        if let Some((left, right)) = self.as_subtree() {
+            let left = self.storage.get(left)?.unwrap().has_range(range)?;
+            let right = self.storage.get(right)?.unwrap().has_range(range)?;
+            return Ok(left && right);
         }
-        true
+        Ok(true)
     }
 
-    fn inner_ranges(&self, ranges: &mut Vec<Range>) {
-        if let Some((left, right)) = self.children.as_deref() {
-            left.inner_ranges(ranges);
-            right.inner_ranges(ranges);
-        } else if self.children == Children::Data {
+    fn inner_ranges(&self, ranges: &mut Vec<Range>) -> Result<()> {
+        Ok(if let Some((left, right)) = self.as_subtree() {
+            let left = self.storage.get(left)?.unwrap();
+            let right = self.storage.get(right)?.unwrap();
+            left.inner_ranges(ranges)?;
+            right.inner_ranges(ranges)?;
+        } else if self.as_chunk().is_some() {
             if let Some(last) = ranges.last_mut() {
-                if last.end() == self.range.offset() {
-                    last.extend(self.range.length());
-                    return;
+                if last.end() == self.range().offset() {
+                    last.extend(self.range().length());
+                    return Ok(());
                 }
             }
-            ranges.push(self.range);
-        }
+            ranges.push(*self.range());
+        })
     }
 
-    pub fn ranges(&self) -> Vec<Range> {
-        let mut ranges = Vec::with_capacity(self.range.num_chunks() as _);
-        self.inner_ranges(&mut ranges);
-        ranges
+    pub fn ranges(&self) -> Result<Vec<Range>> {
+        let mut ranges = Vec::with_capacity(self.range().num_chunks() as _);
+        self.inner_ranges(&mut ranges)?;
+        Ok(ranges)
     }
 
-    fn inner_missing_ranges(&self, ranges: &mut Vec<Range>) {
-        if let Some((left, right)) = self.children.as_deref() {
-            left.inner_missing_ranges(ranges);
-            right.inner_missing_ranges(ranges);
-        } else if self.children == Children::None {
+    fn inner_missing_ranges(&self, ranges: &mut Vec<Range>) -> Result<()> {
+        Ok(if let Some((left, right)) = self.as_subtree() {
+            let left = self.storage.get(left)?.unwrap();
+            let right = self.storage.get(right)?.unwrap();
+            left.inner_missing_ranges(ranges)?;
+            right.inner_missing_ranges(ranges)?;
+        } else if self.is_missing() {
             if let Some(last) = ranges.last_mut() {
-                if last.end() == self.range.offset() {
-                    last.extend(self.range.length());
-                    return;
+                if last.end() == self.range().offset() {
+                    last.extend(self.range().length());
+                    return Ok(());
                 }
             }
-            ranges.push(self.range);
-        }
+            ranges.push(*self.range());
+        })
     }
 
-    pub fn missing_ranges(&self) -> Vec<Range> {
-        let mut ranges = Vec::with_capacity(self.range.num_chunks() as _);
-        self.inner_missing_ranges(&mut ranges);
-        ranges
+    pub fn missing_ranges(&self) -> Result<Vec<Range>> {
+        let mut ranges = Vec::with_capacity(self.range().num_chunks() as _);
+        self.inner_missing_ranges(&mut ranges)?;
+        Ok(ranges)
     }
 
     fn inner_encode_range_to(
@@ -175,21 +294,23 @@ impl Tree {
     ) -> Result<()> {
         if self.is_chunk() {
             if range.intersects(self.range()) {
-                if self.children == Children::Data {
-                    let chunk = &mut [0; 1024][..self.range.length() as _];
-                    chunks.seek(SeekFrom::Start(self.range.offset()))?;
+                if self.as_chunk().is_some() {
+                    let chunk = &mut [0; 1024][..self.range().length() as _];
+                    chunks.seek(SeekFrom::Start(self.range().offset()))?;
                     chunks.read_exact(chunk)?;
                     tree.write_all(chunk)?;
                 } else {
                     anyhow::bail!("missing chunk");
                 }
             }
-        } else if let Some((left, right)) = self.children.as_deref() {
-            tree.write_all(left.hash().as_bytes())?;
-            tree.write_all(right.hash().as_bytes())?;
+        } else if let Some((left, right)) = self.as_subtree() {
+            tree.write_all(left.as_bytes())?;
+            tree.write_all(right.as_bytes())?;
+            let left = self.storage.get(left)?.unwrap();
             if range.intersects(left.range()) {
                 left.inner_encode_range_to(range, tree, chunks)?;
             }
+            let right = self.storage.get(right)?.unwrap();
             if range.intersects(right.range()) {
                 right.inner_encode_range_to(range, tree, chunks)?;
             }
@@ -205,7 +326,7 @@ impl Tree {
         tree: &mut impl Write,
         chunks: &mut (impl Read + Seek),
     ) -> Result<()> {
-        anyhow::ensure!(self.is_root);
+        anyhow::ensure!(self.is_root());
         let length = self.range().length();
         tree.write_all(&length.to_le_bytes()[..])?;
         self.inner_encode_range_to(range, tree, chunks)
@@ -222,22 +343,22 @@ impl Tree {
     }
 
     fn inner_decode_range_from(
-        &mut self,
-        range: Range,
+        &self,
+        range: &Range,
         tree: &mut impl Read,
         chunks: &mut (impl Write + Seek),
     ) -> Result<()> {
         if self.is_chunk() {
-            if self.children == Children::None && range.intersects(self.range()) {
-                let chunk = &mut [0; 1024][..self.range.length() as _];
+            if self.is_missing() && range.intersects(self.range()) {
+                let chunk = &mut [0; 1024][..self.range().length() as _];
                 tree.read_exact(chunk)?;
-                let hash = blake3::guts::ChunkState::new(self.range.index())
+                let hash = blake3::guts::ChunkState::new(self.range().index())
                     .update(chunk)
-                    .finalize(self.is_root);
+                    .finalize(self.is_root());
                 anyhow::ensure!(*self.hash() == hash);
                 chunks.seek(SeekFrom::Start(self.range().offset()))?;
                 chunks.write_all(chunk)?;
-                self.children = Children::Data;
+                self.set_data()?;
             }
         } else {
             let mut left_hash = [0; 32];
@@ -248,26 +369,16 @@ impl Tree {
             tree.read_exact(&mut right_hash)?;
             let right_hash = Hash::from(right_hash);
 
-            let hash = blake3::guts::parent_cv(&left_hash, &right_hash, self.is_root);
+            let hash = blake3::guts::parent_cv(&left_hash, &right_hash, self.is_root());
             anyhow::ensure!(*self.hash() == hash);
 
-            if self.children == Children::None {
-                let (left_range, right_range) = self.range().split().unwrap();
-                let left = Self {
-                    is_root: false,
-                    hash: left_hash,
-                    range: left_range,
-                    children: Children::None,
-                };
-                let right = Self {
-                    is_root: false,
-                    hash: right_hash,
-                    range: right_range,
-                    children: Children::None,
-                };
-                self.children = Children::Tree(Box::new((left, right)));
-            }
-            let (left, right) = self.children.as_deref_mut().unwrap();
+            let (left, right) = if let Some((left, right)) = self.as_subtree() {
+                let left = self.storage.get(left)?.unwrap();
+                let right = self.storage.get(right)?.unwrap();
+                (left, right)
+            } else {
+                self.create_children(left_hash, right_hash)?
+            };
             if range.intersects(left.range()) {
                 left.inner_decode_range_from(range, tree, chunks)?;
             }
@@ -279,30 +390,30 @@ impl Tree {
     }
 
     pub fn decode_range_from(
-        &mut self,
-        range: Range,
+        &self,
+        range: &Range,
         tree: &mut impl Read,
         chunks: &mut (impl Write + Seek),
     ) -> Result<()> {
-        anyhow::ensure!(self.is_root);
+        anyhow::ensure!(self.is_root());
         let mut length = [0; 8];
         tree.read_exact(&mut length)?;
         let length = u64::from_le_bytes(length);
-        anyhow::ensure!(self.range == Range::new(0, length));
+        anyhow::ensure!(*self.range() == Range::new(0, length));
         self.inner_decode_range_from(range, tree, chunks)
     }
 
     pub fn decode_range(
-        &mut self,
-        range: Range,
+        &self,
+        range: &Range,
         mut tree: &[u8],
         chunks: &mut (impl Write + Seek),
     ) -> Result<()> {
         self.decode_range_from(range, &mut tree, chunks)
     }
 
-    pub fn decode(&mut self, tree: &[u8], chunks: &mut (impl Write + Seek)) -> Result<()> {
-        self.decode_range(self.range, tree, chunks)
+    pub fn decode(&self, tree: &[u8], chunks: &mut (impl Write + Seek)) -> Result<()> {
+        self.decode_range(self.range(), tree, chunks)
     }
 }
 
