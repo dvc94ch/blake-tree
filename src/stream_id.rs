@@ -1,4 +1,4 @@
-use crate::{Hash, Mime, Result};
+use crate::{Hash, Mime, Range, Result};
 use base64::{
     alphabet,
     engine::fast_portable::{self, FastPortable},
@@ -24,6 +24,10 @@ impl StreamId {
 
     pub fn length(self) -> u64 {
         self.length
+    }
+
+    pub fn range(self) -> Range {
+        Range::new(0, self.length)
     }
 
     pub fn mime(self) -> Mime {

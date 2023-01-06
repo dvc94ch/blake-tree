@@ -62,7 +62,7 @@ impl StreamSlicer {
         self.tree.encode_range_to(range, to, &mut self.chunks)
     }
 
-    pub fn read_range(&mut self, range: &Range) -> Vec<u8> {
+    pub fn read_range(&mut self, range: &Range) -> Result<Vec<u8>> {
         self.tree.encode_range(range, &mut self.chunks)
     }
 }
@@ -145,12 +145,14 @@ pub struct StreamStorage {
 }
 
 impl StreamStorage {
-    pub fn new(path: PathBuf) -> Result<Self> {
-        let chunks = path.join("chunks");
+    pub fn new(path: impl AsRef<Path>) -> Result<Self> {
+        let chunks = path.as_ref().join("chunks");
+        let db = path.as_ref().join("trees");
         std::fs::create_dir_all(&chunks)?;
-        let db = sled::open(path.join("trees"))?;
+        let db = sled::open(db)?;
         let tree = db.open_tree("trees")?;
         let storage = TreeStorage::new(tree);
+        // TODO: crash recovery
         Ok(Self { chunks, storage })
     }
 
@@ -178,9 +180,13 @@ impl StreamStorage {
         std::iter::empty()
     }
 
-    pub fn contains(&self, id: StreamId) -> bool {
-        // TODO: use db
-        self.stream_path(id).exists()
+    pub fn contains(&self, id: StreamId, range: Option<Range>) -> Result<bool> {
+        let range = range.unwrap_or_else(|| id.range());
+        if let Some(tree) = self.storage.get(id.hash())? {
+            tree.has_range(range)
+        } else {
+            false
+        }
     }
 
     pub fn remove(&self, id: StreamId) -> Result<()> {
@@ -202,7 +208,8 @@ impl StreamStorage {
         hasher.finalize(mime)
     }
 
-    pub fn reader(&self, id: StreamId, range: Range) -> Result<StreamReader> {
+    pub fn reader(&self, id: StreamId, range: Option<Range>) -> Result<StreamReader> {
+        let range = range.unwrap_or_else(|| id.range());
         let tree = self.storage.get(id.hash())?.context("missing stream")?;
         StreamReader::new(&self.stream_path(id), tree, range)
     }
@@ -215,5 +222,41 @@ impl StreamStorage {
     pub fn slicer(&self, id: StreamId) -> Result<StreamSlicer> {
         let tree = self.storage.get(id.hash())?.context("missing stream")?;
         StreamSlicer::new(&self.stream_path(id), tree)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_store() -> Result<()> {
+        let data = [0x42; 2049];
+        let range = Range::new(1024, 1024);
+
+        let store1 = StreamStorage::new("/tmp/store1")?;
+        let store2 = StreamStorage::new("/tmp/store2")?;
+
+        let mut hasher = store1.hasher()?;
+        hasher.write_all(&data[..])?;
+        let id = hasher.finalize(Mime::ApplicationOctetStream)?;
+
+        let mut buf = Vec::with_capacity(id.length() as _);
+        store1.reader(id, None)?.read_to_end(&mut buf)?;
+        assert_eq!(buf, data);
+
+        buf.clear();
+        store1.slicer(id)?.read_range_to(&range, &mut buf)?;
+
+        store2.writer(id)?.write_range_from(&range, &mut &buf[..])?;
+
+        buf.clear();
+        store2.reader(id, Some(range))?.read_to_end(&mut buf)?;
+        assert_eq!(buf, [0x42; 1024]);
+
+        store1.remove(id)?;
+        store2.remove(id)?;
+
+        Ok(())
     }
 }

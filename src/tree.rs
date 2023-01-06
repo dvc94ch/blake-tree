@@ -1,7 +1,7 @@
 use crate::{Hash, Range, Result};
 use std::io::{Read, Seek, SeekFrom, Write};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct TreeStorage {
     tree: sled::Tree,
 }
@@ -9,6 +9,13 @@ pub struct TreeStorage {
 impl TreeStorage {
     pub fn new(tree: sled::Tree) -> Self {
         Self { tree }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn memory() -> Result<Self> {
+        let db = sled::Config::new().temporary(true).open()?;
+        let tree = db.open_tree("trees")?;
+        Ok(Self::new(tree))
     }
 
     pub(crate) fn get(&self, _hash: &Hash) -> Result<Option<Tree>> {
@@ -90,10 +97,16 @@ impl Node {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Tree {
     storage: TreeStorage,
     node: Node,
+}
+
+impl PartialEq for Tree {
+    fn eq(&self, other: &Self) -> bool {
+        self.node == other.node
+    }
 }
 
 impl Tree {
@@ -332,13 +345,13 @@ impl Tree {
         self.inner_encode_range_to(range, tree, chunks)
     }
 
-    pub fn encode_range(&self, range: &Range, chunks: &mut (impl Read + Seek)) -> Vec<u8> {
+    pub fn encode_range(&self, range: &Range, chunks: &mut (impl Read + Seek)) -> Result<Vec<u8>> {
         let mut tree = Vec::with_capacity(range.encoded_size() as _);
-        self.encode_range_to(range, &mut tree, chunks).unwrap();
-        tree
+        self.encode_range_to(range, &mut tree, chunks)?;
+        Ok(tree)
     }
 
-    pub fn encode(&self, chunks: &mut (impl Read + Seek)) -> Vec<u8> {
+    pub fn encode(&self, chunks: &mut (impl Read + Seek)) -> Result<Vec<u8>> {
         self.encode_range(self.range(), chunks)
     }
 
@@ -424,77 +437,75 @@ mod tests {
     use std::io::Cursor;
 
     #[test]
-    fn test_tree() {
+    fn test_tree() -> Result<()> {
+        let s1 = TreeStorage::memory()?;
+        let s2 = TreeStorage::memory()?;
+        let s3 = TreeStorage::memory()?;
         let buf = [0x42; 65537];
         for &case in crate::tests::TEST_CASES {
             dbg!(case);
             let bytes = &buf[..(case as _)];
             let mut buffer = vec![];
             let (bao_bytes, bao_hash) = bao::encode::encode(bytes);
-            let tree = crate::tree_hash(bytes);
+            let tree = crate::tree_hash(s1.clone(), bytes)?;
             //dbg!(&tree);
             assert_eq!(tree.hash(), &bao_hash);
-            assert!(tree.complete());
-            assert_eq!(tree.length(), Some(case));
-            assert_eq!(tree.ranges(), vec![tree.range]);
-            assert_eq!(tree.missing_ranges(), vec![]);
+            assert!(tree.complete()?);
+            assert_eq!(tree.length()?, Some(case));
+            assert_eq!(tree.ranges()?, vec![*tree.range()]);
+            assert_eq!(tree.missing_ranges()?, vec![]);
 
-            let mut tree2 = Tree::new(*tree.hash(), tree.range().length());
+            let tree2 = Tree::new(s2.clone(), *tree.hash(), tree.range().length())?;
             assert_eq!(tree2.hash(), &bao_hash);
-            assert!(!tree2.complete());
-            assert_eq!(tree2.length(), None);
-            assert_eq!(tree2.ranges(), vec![]);
-            assert_eq!(tree2.missing_ranges(), vec![tree.range]);
+            assert!(!tree2.complete()?);
+            assert_eq!(tree2.length()?, None);
+            assert_eq!(tree2.ranges()?, vec![]);
+            assert_eq!(tree2.missing_ranges()?, vec![*tree.range()]);
 
-            let slice = tree.encode(&mut Cursor::new(bytes));
+            let slice = tree.encode(&mut Cursor::new(bytes))?;
             assert!(slice.len() as u64 <= tree.range().encoded_size());
             assert_eq!(bao_bytes, slice);
             buffer.clear();
-            tree2.decode(&slice, &mut Cursor::new(&mut buffer)).unwrap();
+            tree2.decode(&slice, &mut Cursor::new(&mut buffer))?;
             assert_eq!(tree2, tree);
             assert_eq!(bytes, buffer);
 
             if let Some((left_range, right_range)) = tree.range().split() {
-                let left_slice = tree.encode_range(&left_range, &mut Cursor::new(bytes));
+                let left_slice = tree.encode_range(&left_range, &mut Cursor::new(bytes))?;
                 let mut left_slice2 = vec![];
                 SliceExtractor::new(
                     Cursor::new(&bao_bytes),
                     left_range.offset(),
                     left_range.length(),
                 )
-                .read_to_end(&mut left_slice2)
-                .unwrap();
+                .read_to_end(&mut left_slice2)?;
                 assert_eq!(left_slice, left_slice2);
 
-                let right_slice = tree.encode_range(&right_range, &mut Cursor::new(bytes));
+                let right_slice = tree.encode_range(&right_range, &mut Cursor::new(bytes))?;
                 let mut right_slice2 = vec![];
                 SliceExtractor::new(
                     Cursor::new(&bao_bytes),
                     right_range.offset(),
                     right_range.length(),
                 )
-                .read_to_end(&mut right_slice2)
-                .unwrap();
+                .read_to_end(&mut right_slice2)?;
                 assert_eq!(right_slice, right_slice2);
 
                 buffer.clear();
-                let mut tree2 = Tree::new(*tree.hash(), tree.range().length());
+                let tree2 = Tree::new(s3.clone(), *tree.hash(), tree.range().length())?;
 
-                tree2
-                    .decode_range(left_range, &left_slice, &mut Cursor::new(&mut buffer))
-                    .unwrap();
+                tree2.decode_range(&left_range, &left_slice, &mut Cursor::new(&mut buffer))?;
                 assert_eq!(tree2.hash(), &bao_hash);
-                assert!(!tree2.complete());
-                assert_eq!(tree2.length(), None);
-                assert_eq!(tree2.ranges(), vec![left_range]);
-                assert_eq!(tree2.missing_ranges(), vec![right_range]);
+                assert!(!tree2.complete()?);
+                assert_eq!(tree2.length()?, None);
+                assert_eq!(tree2.ranges()?, vec![left_range]);
+                assert_eq!(tree2.missing_ranges()?, vec![right_range]);
 
-                tree2
-                    .decode_range(right_range, &right_slice, &mut Cursor::new(&mut buffer))
-                    .unwrap();
+                tree2.decode_range(&right_range, &right_slice, &mut Cursor::new(&mut buffer))?;
                 assert_eq!(tree2, tree);
                 assert_eq!(bytes, buffer);
             }
         }
+        Ok(())
     }
 }

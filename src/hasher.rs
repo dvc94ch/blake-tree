@@ -124,14 +124,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_tree_hasher() {
+    fn test_tree_hasher() -> Result<()> {
         let buf = [0x42; 65537];
+        let storage = TreeStorage::memory()?;
         for &case in crate::tests::TEST_CASES {
             dbg!(case);
             let bytes = &buf[..(case as _)];
             let hash = blake3::hash(bytes);
-            let tree = tree_hash(bytes);
+            let tree = tree_hash(storage.clone(), bytes)?;
             assert_eq!(*tree.hash(), hash);
         }
+        Ok(())
     }
 }

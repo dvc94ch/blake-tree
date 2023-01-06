@@ -19,8 +19,6 @@ pub const CHUNK_SIZE: u64 = 1024;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs::File;
-    use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 
     // Interesting input lengths to run tests on.
     pub const TEST_CASES: &[u64] = &[
@@ -46,30 +44,4 @@ mod tests {
         16 * CHUNK_SIZE,
         16 * CHUNK_SIZE + 1,
     ];
-
-    #[test]
-    fn test_example() -> Result<()> {
-        let path = "/tmp/file";
-        let path2 = "/tmp/file2";
-        std::fs::write(path, &[0x42; 2049][..])?;
-        let range = Range::new(1024, 1024);
-
-        let mut chunks = BufReader::new(File::open(path)?);
-        let mut hasher = TreeHasher::new();
-        std::io::copy(&mut chunks, &mut hasher)?;
-        let tree = hasher.finalize();
-        let slice = tree.encode_range(&range, &mut chunks);
-
-        let mut chunks = BufWriter::new(File::create(path2)?);
-        let mut tree2 = Tree::new(*tree.hash(), tree.length().unwrap());
-        tree2.decode_range(range, &slice, &mut chunks)?;
-        chunks.flush()?;
-
-        let mut chunks = BufReader::new(File::open(path2)?);
-        chunks.seek(SeekFrom::Start(range.offset()))?;
-        let mut chunk = [0; 1024];
-        chunks.read_exact(&mut chunk)?;
-        assert_eq!(chunk, [0x42; 1024]);
-        Ok(())
-    }
 }
