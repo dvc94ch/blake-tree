@@ -8,9 +8,9 @@ mod tree;
 pub use crate::hasher::{tree_hash, TreeHasher};
 pub use crate::mime::{Mime, MimeType};
 pub use crate::range::Range;
-pub use crate::store::{StreamHasher, StreamReader, StreamSlicer, StreamStorage, StreamWriter};
+pub use crate::store::{RangeReader, Stream, StreamStorage};
 pub use crate::stream_id::StreamId;
-pub use crate::tree::{Tree, TreeStorage};
+pub use crate::tree::{NodeStorage, Tree};
 pub use anyhow::Result;
 pub use blake3::Hash;
 

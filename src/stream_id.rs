@@ -3,6 +3,9 @@ use base64::{
     alphabet,
     engine::fast_portable::{self, FastPortable},
 };
+use std::fs::File;
+use std::io::BufReader;
+use std::path::Path;
 
 const BASE64_ENGINE: FastPortable = FastPortable::from(&alphabet::URL_SAFE, fast_portable::PAD);
 
@@ -32,6 +35,16 @@ impl StreamId {
 
     pub fn mime(self) -> Mime {
         Mime::from_u16(self.mime).unwrap_or_default()
+    }
+
+    pub fn from_path(path: &Path) -> Result<Self> {
+        let mime = Mime::from_path(path).unwrap_or_default();
+        let mut f = BufReader::new(File::open(path)?);
+        let mut hasher = blake3::Hasher::new();
+        std::io::copy(&mut f, &mut hasher)?;
+        let length = hasher.count();
+        let hash = hasher.finalize();
+        Ok(StreamId::new(hash, length, mime as _))
     }
 
     pub fn from_bytes(bytes: [u8; 42]) -> Self {

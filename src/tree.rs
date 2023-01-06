@@ -2,11 +2,11 @@ use crate::{Hash, Range, Result};
 use std::io::{Read, Seek, SeekFrom, Write};
 
 #[derive(Clone, Debug)]
-pub struct TreeStorage {
+pub struct NodeStorage {
     tree: sled::Tree,
 }
 
-impl TreeStorage {
+impl NodeStorage {
     pub fn new(tree: sled::Tree) -> Self {
         Self { tree }
     }
@@ -99,7 +99,7 @@ impl Node {
 
 #[derive(Clone, Debug)]
 pub struct Tree {
-    storage: TreeStorage,
+    storage: NodeStorage,
     node: Node,
 }
 
@@ -110,17 +110,17 @@ impl PartialEq for Tree {
 }
 
 impl Tree {
-    fn create_node(storage: TreeStorage, node: Node) -> Result<Self> {
+    fn create_node(storage: NodeStorage, node: Node) -> Result<Self> {
         storage.insert(&node)?;
         Ok(Self { storage, node })
     }
 
-    pub fn new(storage: TreeStorage, hash: Hash, length: u64) -> Result<Self> {
+    pub fn new(storage: NodeStorage, hash: Hash, length: u64) -> Result<Self> {
         Self::create_node(storage, Node::new(hash, length))
     }
 
     pub(crate) fn chunk(
-        storage: TreeStorage,
+        storage: NodeStorage,
         hash: Hash,
         range: Range,
         is_root: bool,
@@ -129,7 +129,7 @@ impl Tree {
     }
 
     pub(crate) fn subtree(
-        storage: TreeStorage,
+        storage: NodeStorage,
         hash: Hash,
         range: Range,
         is_root: bool,
@@ -212,18 +212,6 @@ impl Tree {
         })
     }
 
-    pub fn complete(&self) -> Result<bool> {
-        Ok(if self.as_chunk().is_some() {
-            true
-        } else if let Some((left, right)) = self.as_subtree() {
-            let left = self.storage.get(left)?.unwrap().complete()?;
-            let right = self.storage.get(right)?.unwrap().complete()?;
-            left && right
-        } else {
-            false
-        })
-    }
-
     pub fn last_chunk(&self) -> Result<Tree> {
         Ok(if let Some(right) = self.right()? {
             right.last_chunk()?
@@ -239,6 +227,10 @@ impl Tree {
         } else {
             None
         })
+    }
+
+    pub fn complete(&self) -> Result<bool> {
+        self.has_range(self.range())
     }
 
     pub fn has_range(&self, range: &Range) -> Result<bool> {
@@ -438,9 +430,9 @@ mod tests {
 
     #[test]
     fn test_tree() -> Result<()> {
-        let s1 = TreeStorage::memory()?;
-        let s2 = TreeStorage::memory()?;
-        let s3 = TreeStorage::memory()?;
+        let s1 = NodeStorage::memory()?;
+        let s2 = NodeStorage::memory()?;
+        let s3 = NodeStorage::memory()?;
         let buf = [0x42; 65537];
         for &case in crate::tests::TEST_CASES {
             dbg!(case);

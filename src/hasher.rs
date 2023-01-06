@@ -1,9 +1,9 @@
-use crate::{Range, Result, Tree, TreeStorage, CHUNK_SIZE};
+use crate::{NodeStorage, Range, Result, Tree, CHUNK_SIZE};
 use std::io::Write;
 
 #[derive(Clone)]
 pub struct TreeHasher {
-    storage: TreeStorage,
+    storage: NodeStorage,
     stack: Vec<Tree>,
     chunk: [u8; 1024],
     chunk_length: usize,
@@ -12,7 +12,7 @@ pub struct TreeHasher {
 }
 
 impl TreeHasher {
-    pub fn new(storage: TreeStorage) -> Self {
+    pub fn new(storage: NodeStorage) -> Self {
         Self {
             storage,
             stack: vec![],
@@ -113,7 +113,7 @@ impl Write for TreeHasher {
     }
 }
 
-pub fn tree_hash(storage: TreeStorage, bytes: &[u8]) -> Result<Tree> {
+pub fn tree_hash(storage: NodeStorage, bytes: &[u8]) -> Result<Tree> {
     let mut hasher = TreeHasher::new(storage);
     hasher.update(bytes)?;
     hasher.finalize()
@@ -126,7 +126,7 @@ mod tests {
     #[test]
     fn test_tree_hasher() -> Result<()> {
         let buf = [0x42; 65537];
-        let storage = TreeStorage::memory()?;
+        let storage = NodeStorage::memory()?;
         for &case in crate::tests::TEST_CASES {
             dbg!(case);
             let bytes = &buf[..(case as _)];
