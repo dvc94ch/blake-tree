@@ -1,219 +1,129 @@
-use crate::{Hash, Range, Result};
+use crate::{Hash, Range, Result, StreamId};
 use std::io::{Read, Seek, SeekFrom, Write};
 
-#[derive(Clone, Debug)]
-pub struct NodeStorage {
-    tree: sled::Tree,
-}
-
-impl NodeStorage {
-    pub fn new(tree: sled::Tree) -> Self {
-        Self { tree }
-    }
-
-    #[cfg(test)]
-    pub(crate) fn memory() -> Result<Self> {
-        let db = sled::Config::new().temporary(true).open()?;
-        let tree = db.open_tree("trees")?;
-        Ok(Self::new(tree))
-    }
-
-    pub(crate) fn get(&self, _hash: &Hash) -> Result<Option<Tree>> {
-        todo!()
-    }
-
-    fn insert(&self, _tree: &Node) -> Result<()> {
-        todo!()
-    }
-
-    fn insert_children(&self, _hash: &Hash, _left: &Node, _right: &Node) -> Result<()> {
-        todo!()
-    }
-
-    fn set_data(&self, _hash: &Hash) -> Result<()> {
-        todo!()
-    }
-}
-
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum Children {
-    None,
-    Data,
-    Tree(Hash, Hash),
-}
-
-impl Children {
-    fn as_chunk(&self) -> Option<()> {
-        if *self == Self::Data {
-            Some(())
-        } else {
-            None
-        }
-    }
-
-    fn as_subtree(&self) -> Option<(&Hash, &Hash)> {
-        if let Self::Tree(left, right) = self {
-            Some((left, right))
-        } else {
-            None
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct Node {
-    hash: Hash,
-    range: Range,
-    is_root: bool,
-    children: Children,
-}
-
-impl Node {
-    fn new(hash: Hash, length: u64) -> Self {
-        Self {
-            range: Range::new(0, length),
-            is_root: true,
-            hash,
-            children: Children::None,
-        }
-    }
-
-    fn chunk(hash: Hash, range: Range, is_root: bool) -> Self {
-        Self {
-            hash,
-            range,
-            is_root,
-            children: Children::Data,
-        }
-    }
-
-    fn subtree(hash: Hash, range: Range, is_root: bool, left: Hash, right: Hash) -> Self {
-        Self {
-            hash,
-            range,
-            is_root,
-            children: Children::Tree(left, right),
-        }
-    }
+pub enum Insertion {
+    Parent(Hash, Hash, Hash),
+    Chunk(Hash),
 }
 
 #[derive(Clone, Debug)]
 pub struct Tree {
-    storage: NodeStorage,
-    node: Node,
+    tree: sled::Tree,
+    id: StreamId,
+    hash: Hash,
+    range: Range,
+    is_root: bool,
 }
 
 impl PartialEq for Tree {
     fn eq(&self, other: &Self) -> bool {
-        self.node == other.node
+        self.hash == other.hash
     }
 }
 
 impl Tree {
-    fn create_node(storage: NodeStorage, node: Node) -> Result<Self> {
-        storage.insert(&node)?;
-        Ok(Self { storage, node })
+    pub fn open(db: &sled::Db, id: StreamId) -> Result<Self> {
+        let tree = db.open_tree(id.to_bytes())?;
+        Ok(Self {
+            tree,
+            id,
+            hash: *id.hash(),
+            range: id.range(),
+            is_root: true,
+        })
     }
 
-    pub fn new(storage: NodeStorage, hash: Hash, length: u64) -> Result<Self> {
-        Self::create_node(storage, Node::new(hash, length))
+    fn insert(&self, insertion: &Insertion) -> Result<()> {
+        match insertion {
+            Insertion::Chunk(hash) => {
+                self.tree.insert(hash.as_bytes(), &[])?;
+            }
+            Insertion::Parent(hash, left, right) => {
+                let mut value = [0; 64];
+                value[..32].copy_from_slice(left.as_bytes());
+                value[32..].copy_from_slice(right.as_bytes());
+                self.tree.insert(hash.as_bytes(), &value[..])?;
+            }
+        }
+        Ok(())
     }
 
-    pub(crate) fn chunk(
-        storage: NodeStorage,
-        hash: Hash,
-        range: Range,
-        is_root: bool,
-    ) -> Result<Self> {
-        Self::create_node(storage, Node::chunk(hash, range, is_root))
+    pub(crate) fn apply_batch(&self, batch: &[Insertion]) -> Result<()> {
+        for insertion in batch {
+            self.insert(insertion)?;
+        }
+        Ok(())
     }
 
-    pub(crate) fn subtree(
-        storage: NodeStorage,
-        hash: Hash,
-        range: Range,
-        is_root: bool,
-        left: Hash,
-        right: Hash,
-    ) -> Result<Self> {
-        Self::create_node(storage, Node::subtree(hash, range, is_root, left, right))
+    pub fn id(&self) -> &StreamId {
+        &self.id
     }
 
     pub fn hash(&self) -> &Hash {
-        &self.node.hash
+        &self.hash
     }
 
     pub fn range(&self) -> &Range {
-        &self.node.range
+        &self.range
     }
 
     pub fn is_root(&self) -> bool {
-        self.node.is_root
+        self.is_root
     }
 
     pub fn is_chunk(&self) -> bool {
-        self.node.range.is_chunk()
+        self.range.is_chunk()
     }
 
-    pub fn is_missing(&self) -> bool {
-        self.node.children == Children::None
+    fn is_missing(&self) -> Result<bool> {
+        Ok(!self.tree.contains_key(self.hash().as_bytes())?)
     }
 
-    pub fn as_chunk(&self) -> Option<()> {
-        self.node.children.as_chunk()
-    }
-
-    pub fn as_subtree(&self) -> Option<(&Hash, &Hash)> {
-        self.node.children.as_subtree()
+    fn data(&self) -> Result<bool> {
+        Ok(self.is_chunk() && self.tree.contains_key(self.hash().as_bytes())?)
     }
 
     fn set_data(&self) -> Result<()> {
-        self.storage.set_data(self.hash())
+        self.insert(&Insertion::Chunk(*self.hash()))
     }
 
-    fn create_children(&self, left: Hash, right: Hash) -> Result<(Tree, Tree)> {
-        let (left_range, right_range) = self.range().split().unwrap();
-        let left = Self {
-            node: Node {
-                is_root: false,
+    fn children(&self) -> Result<Option<(Self, Self)>> {
+        Ok(self.tree.get(self.hash.as_bytes())?.and_then(|bytes| {
+            if bytes.is_empty() {
+                return None;
+            }
+            let (left, right) = bytes.split_at(32);
+            let mut hash = [0; 32];
+            hash.copy_from_slice(left);
+            let left = Hash::from(hash);
+            hash.copy_from_slice(right);
+            let right = Hash::from(hash);
+            let range = self.range.split().unwrap();
+            let left = Self {
+                tree: self.tree.clone(),
+                id: self.id,
                 hash: left,
-                range: left_range,
-                children: Children::None,
-            },
-            storage: self.storage.clone(),
-        };
-        let right = Self {
-            node: Node {
+                range: range.0,
                 is_root: false,
+            };
+            let right = Self {
+                tree: self.tree.clone(),
+                id: self.id,
                 hash: right,
-                range: right_range,
-                children: Children::None,
-            },
-            storage: self.storage.clone(),
-        };
-        self.storage
-            .insert_children(self.hash(), &left.node, &right.node)?;
-        Ok((left, right))
+                range: range.1,
+                is_root: false,
+            };
+            Some((left, right))
+        }))
     }
 
-    pub fn left(&self) -> Result<Option<Tree>> {
-        Ok(if let Some((left, _)) = self.as_subtree() {
-            self.storage.get(left)?
-        } else {
-            None
-        })
+    fn set_children(&self, left: &Hash, right: &Hash) -> Result<()> {
+        self.insert(&Insertion::Parent(*self.hash(), *left, *right))
     }
 
-    pub fn right(&self) -> Result<Option<Tree>> {
-        Ok(if let Some((_, right)) = self.as_subtree() {
-            self.storage.get(right)?
-        } else {
-            None
-        })
-    }
-
-    pub fn last_chunk(&self) -> Result<Tree> {
-        Ok(if let Some(right) = self.right()? {
+    fn last_chunk(&self) -> Result<Tree> {
+        Ok(if let Some((_, right)) = self.children()? {
             right.last_chunk()?
         } else {
             self.clone()
@@ -222,7 +132,7 @@ impl Tree {
 
     pub fn length(&self) -> Result<Option<u64>> {
         let last = self.last_chunk()?;
-        Ok(if last.as_chunk().is_some() {
+        Ok(if last.data()? {
             Some(last.range().end())
         } else {
             None
@@ -234,24 +144,20 @@ impl Tree {
     }
 
     pub fn has_range(&self, range: &Range) -> Result<bool> {
-        if self.is_missing() && range.intersects(self.range()) {
+        if self.is_missing()? && range.intersects(self.range()) {
             return Ok(false);
         }
-        if let Some((left, right)) = self.as_subtree() {
-            let left = self.storage.get(left)?.unwrap().has_range(range)?;
-            let right = self.storage.get(right)?.unwrap().has_range(range)?;
-            return Ok(left && right);
+        if let Some((left, right)) = self.children()? {
+            return Ok(left.has_range(range)? && right.has_range(range)?);
         }
         Ok(true)
     }
 
     fn inner_ranges(&self, ranges: &mut Vec<Range>) -> Result<()> {
-        Ok(if let Some((left, right)) = self.as_subtree() {
-            let left = self.storage.get(left)?.unwrap();
-            let right = self.storage.get(right)?.unwrap();
+        Ok(if let Some((left, right)) = self.children()? {
             left.inner_ranges(ranges)?;
             right.inner_ranges(ranges)?;
-        } else if self.as_chunk().is_some() {
+        } else if self.data()? {
             if let Some(last) = ranges.last_mut() {
                 if last.end() == self.range().offset() {
                     last.extend(self.range().length());
@@ -269,12 +175,10 @@ impl Tree {
     }
 
     fn inner_missing_ranges(&self, ranges: &mut Vec<Range>) -> Result<()> {
-        Ok(if let Some((left, right)) = self.as_subtree() {
-            let left = self.storage.get(left)?.unwrap();
-            let right = self.storage.get(right)?.unwrap();
+        Ok(if let Some((left, right)) = self.children()? {
             left.inner_missing_ranges(ranges)?;
             right.inner_missing_ranges(ranges)?;
-        } else if self.is_missing() {
+        } else if self.is_missing()? {
             if let Some(last) = ranges.last_mut() {
                 if last.end() == self.range().offset() {
                     last.extend(self.range().length());
@@ -299,7 +203,7 @@ impl Tree {
     ) -> Result<()> {
         if self.is_chunk() {
             if range.intersects(self.range()) {
-                if self.as_chunk().is_some() {
+                if self.data()? {
                     let chunk = &mut [0; 1024][..self.range().length() as _];
                     chunks.seek(SeekFrom::Start(self.range().offset()))?;
                     chunks.read_exact(chunk)?;
@@ -308,14 +212,12 @@ impl Tree {
                     anyhow::bail!("missing chunk");
                 }
             }
-        } else if let Some((left, right)) = self.as_subtree() {
-            tree.write_all(left.as_bytes())?;
-            tree.write_all(right.as_bytes())?;
-            let left = self.storage.get(left)?.unwrap();
+        } else if let Some((left, right)) = self.children()? {
+            tree.write_all(left.hash().as_bytes())?;
+            tree.write_all(right.hash().as_bytes())?;
             if range.intersects(left.range()) {
                 left.inner_encode_range_to(range, tree, chunks)?;
             }
-            let right = self.storage.get(right)?.unwrap();
             if range.intersects(right.range()) {
                 right.inner_encode_range_to(range, tree, chunks)?;
             }
@@ -354,7 +256,7 @@ impl Tree {
         chunks: &mut (impl Write + Seek),
     ) -> Result<()> {
         if self.is_chunk() {
-            if self.is_missing() && range.intersects(self.range()) {
+            if self.is_missing()? && range.intersects(self.range()) {
                 let chunk = &mut [0; 1024][..self.range().length() as _];
                 tree.read_exact(chunk)?;
                 let hash = blake3::guts::ChunkState::new(self.range().index())
@@ -377,13 +279,8 @@ impl Tree {
             let hash = blake3::guts::parent_cv(&left_hash, &right_hash, self.is_root());
             anyhow::ensure!(*self.hash() == hash);
 
-            let (left, right) = if let Some((left, right)) = self.as_subtree() {
-                let left = self.storage.get(left)?.unwrap();
-                let right = self.storage.get(right)?.unwrap();
-                (left, right)
-            } else {
-                self.create_children(left_hash, right_hash)?
-            };
+            self.set_children(&left_hash, &right_hash)?;
+            let (left, right) = self.children()?.unwrap();
             if range.intersects(left.range()) {
                 left.inner_decode_range_from(range, tree, chunks)?;
             }
@@ -425,21 +322,22 @@ impl Tree {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{tree_hash, Mime};
     use bao::encode::SliceExtractor;
     use std::io::Cursor;
 
     #[test]
     fn test_tree() -> Result<()> {
-        let s1 = NodeStorage::memory()?;
-        let s2 = NodeStorage::memory()?;
-        let s3 = NodeStorage::memory()?;
         let buf = [0x42; 65537];
+        let db = crate::tests::memory()?;
         for &case in crate::tests::TEST_CASES {
             dbg!(case);
             let bytes = &buf[..(case as _)];
             let mut buffer = vec![];
             let (bao_bytes, bao_hash) = bao::encode::encode(bytes);
-            let tree = crate::tree_hash(s1.clone(), bytes)?;
+            let tree = tree_hash(&db, bytes, Mime::ApplicationOctetStream)?;
+            let id = *tree.id();
+
             //dbg!(&tree);
             assert_eq!(tree.hash(), &bao_hash);
             assert!(tree.complete()?);
@@ -447,7 +345,7 @@ mod tests {
             assert_eq!(tree.ranges()?, vec![*tree.range()]);
             assert_eq!(tree.missing_ranges()?, vec![]);
 
-            let tree2 = Tree::new(s2.clone(), *tree.hash(), tree.range().length())?;
+            let tree2 = Tree::open(&db, id)?;
             assert_eq!(tree2.hash(), &bao_hash);
             assert!(!tree2.complete()?);
             assert_eq!(tree2.length()?, None);
@@ -484,7 +382,7 @@ mod tests {
                 assert_eq!(right_slice, right_slice2);
 
                 buffer.clear();
-                let tree2 = Tree::new(s3.clone(), *tree.hash(), tree.range().length())?;
+                let tree2 = Tree::open(&db, id)?;
 
                 tree2.decode_range(&left_range, &left_slice, &mut Cursor::new(&mut buffer))?;
                 assert_eq!(tree2.hash(), &bao_hash);

@@ -8,9 +8,12 @@ use std::io::BufReader;
 use std::path::Path;
 
 const BASE64_ENGINE: FastPortable = FastPortable::from(&alphabet::URL_SAFE, fast_portable::PAD);
+const BYTES_LENGTH: usize = 43;
+const BASE64_LENGTH: usize = 60;
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct StreamId {
+    version: u8,
     hash: Hash,
     length: u64,
     mime: u16,
@@ -18,7 +21,16 @@ pub struct StreamId {
 
 impl StreamId {
     pub fn new(hash: Hash, length: u64, mime: u16) -> Self {
-        Self { hash, length, mime }
+        Self {
+            version: 0,
+            hash,
+            length,
+            mime,
+        }
+    }
+
+    pub fn version(&self) -> u8 {
+        self.version
     }
 
     pub fn hash(&self) -> &Hash {
@@ -47,35 +59,39 @@ impl StreamId {
         Ok(StreamId::new(hash, length, mime as _))
     }
 
-    pub fn from_bytes(bytes: [u8; 42]) -> Self {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        anyhow::ensure!(bytes.len() == BYTES_LENGTH);
+        anyhow::ensure!(bytes[0] == 0);
         let mut hash = [0; 32];
-        hash.copy_from_slice(&bytes[..32]);
+        hash.copy_from_slice(&bytes[1..33]);
         let mut length = [0; 8];
-        length.copy_from_slice(&bytes[32..40]);
+        length.copy_from_slice(&bytes[33..41]);
         let length = u64::from_le_bytes(length);
         let mut mime = [0; 2];
-        mime.copy_from_slice(&bytes[40..]);
+        mime.copy_from_slice(&bytes[41..]);
         let mime = u16::from_le_bytes(mime);
-        Self::new(hash.into(), length, mime)
+        Ok(Self::new(hash.into(), length, mime))
     }
 
-    pub fn to_bytes(self) -> [u8; 42] {
-        let mut bytes = [0; 42];
-        bytes[..32].copy_from_slice(&self.hash.as_bytes()[..]);
-        bytes[32..40].copy_from_slice(&self.length.to_le_bytes()[..]);
-        bytes[40..].copy_from_slice(&self.mime.to_le_bytes()[..]);
+    pub fn to_bytes(self) -> [u8; BYTES_LENGTH] {
+        let mut bytes = [0; BYTES_LENGTH];
+        bytes[0] = self.version;
+        bytes[1..33].copy_from_slice(&self.hash.as_bytes()[..]);
+        bytes[33..41].copy_from_slice(&self.length.to_le_bytes()[..]);
+        bytes[41..].copy_from_slice(&self.mime.to_le_bytes()[..]);
         bytes
     }
 
-    pub fn from_base64(bytes64: [u8; 56]) -> Result<Self> {
-        let mut bytes = [0; 42];
+    pub fn from_base64(bytes64: &[u8]) -> Result<Self> {
+        anyhow::ensure!(bytes64.len() == BASE64_LENGTH);
+        let mut bytes = [0; BYTES_LENGTH];
         base64::decode_engine_slice(bytes64, &mut bytes, &BASE64_ENGINE)?;
-        Ok(Self::from_bytes(bytes))
+        Self::from_bytes(&bytes[..])
     }
 
-    pub fn to_base64(self) -> [u8; 56] {
+    pub fn to_base64(self) -> [u8; BASE64_LENGTH] {
         let bytes = self.to_bytes();
-        let mut bytes64 = [0; 56];
+        let mut bytes64 = [0; BASE64_LENGTH];
         base64::encode_engine_slice(&bytes[..], &mut bytes64, &BASE64_ENGINE);
         bytes64
     }
@@ -98,12 +114,7 @@ impl std::str::FromStr for StreamId {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.len() != 56 {
-            return Err(anyhow::anyhow!("invalid stream_id length {}", s.len()));
-        }
-        let mut bytes64 = [0; 56];
-        bytes64.copy_from_slice(s.as_bytes());
-        Self::from_base64(bytes64)
+        Self::from_base64(s.as_bytes())
     }
 }
 

@@ -10,7 +10,7 @@ pub use crate::mime::{Mime, MimeType};
 pub use crate::range::Range;
 pub use crate::store::{RangeReader, Stream, StreamStorage};
 pub use crate::stream_id::StreamId;
-pub use crate::tree::{NodeStorage, Tree};
+pub use crate::tree::{Insertion, Tree};
 pub use anyhow::Result;
 pub use blake3::Hash;
 
@@ -44,4 +44,8 @@ mod tests {
         16 * CHUNK_SIZE,
         16 * CHUNK_SIZE + 1,
     ];
+
+    pub fn memory() -> Result<sled::Db> {
+        Ok(sled::Config::new().temporary(true).open()?)
+    }
 }

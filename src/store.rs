@@ -1,4 +1,4 @@
-use crate::{NodeStorage, Range, Result, StreamId, Tree, TreeHasher};
+use crate::{Mime, Range, Result, StreamId, Tree, TreeHasher};
 use std::fs::File;
 use std::io::{self, BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
@@ -53,14 +53,13 @@ impl Seek for RangeReader {
 
 #[derive(Clone, Debug)]
 pub struct Stream {
-    id: StreamId,
     tree: Tree,
     path: PathBuf,
 }
 
 impl Stream {
-    pub fn id(&self) -> StreamId {
-        self.id
+    pub fn id(&self) -> &StreamId {
+        self.tree.id()
     }
 
     pub fn has_range(&self, range: &Range) -> Result<bool> {
@@ -124,73 +123,55 @@ impl StreamStorage {
     }
 
     pub fn streams(&self) -> impl Iterator<Item = StreamId> {
-        self.db.tree_names().into_iter().filter_map(|id| {
-            if id.len() != 42 {
-                return None;
-            }
-            let mut bytes = [0; 42];
-            bytes.copy_from_slice(&id[..]);
-            Some(StreamId::from_bytes(bytes))
-        })
+        self.db
+            .tree_names()
+            .into_iter()
+            .filter_map(|id| StreamId::from_bytes(&id).ok())
     }
 
-    pub fn contains(&self, id: StreamId) -> bool {
+    pub fn contains(&self, id: &StreamId) -> bool {
         chunk_file(&self.chunks, id).exists()
     }
 
-    pub fn get(&self, id: StreamId) -> Result<Stream> {
-        let nodes = open_nodes(&self.db, id)?;
+    pub fn get(&self, id: &StreamId) -> Result<Stream> {
+        let tree = Tree::open(&self.db, *id)?;
         let path = chunk_file(&self.chunks, id);
-        let tree = if !path.exists() {
-            let tree = Tree::new(nodes, *id.hash(), id.length())?;
+        if !path.exists() {
             std::fs::create_dir(path.parent().unwrap())?;
             File::create(&path)?;
-            tree
-        } else {
-            nodes.get(id.hash())?.unwrap()
-        };
-        Ok(Stream { id, tree, path })
+        }
+        Ok(Stream { tree, path })
     }
 
     pub fn insert(&self, path: impl AsRef<Path>) -> Result<Stream> {
         let path = path.as_ref();
-        let id = StreamId::from_path(path)?;
+        let mime = Mime::from_path(path).unwrap_or_default();
 
         let mut input = BufReader::new(File::open(path)?);
-        let nodes = open_nodes(&self.db, id)?;
-        let mut hasher = TreeHasher::new(nodes);
+        let mut hasher = TreeHasher::new();
         std::io::copy(&mut input, &mut hasher)?;
-        let tree = hasher.finalize()?;
+        let tree = hasher.finalize(&self.db, mime)?;
 
-        let output = chunk_file(&self.chunks, id);
+        let output = chunk_file(&self.chunks, tree.id());
         std::fs::create_dir(output.parent().unwrap())?;
         std::fs::copy(path, &output)?;
 
-        Ok(Stream {
-            id,
-            tree,
-            path: output,
-        })
+        Ok(Stream { tree, path: output })
     }
 
-    pub fn remove(&self, id: StreamId) -> Result<()> {
+    pub fn remove(&self, id: &StreamId) -> Result<()> {
         self.db.drop_tree(id.to_bytes())?;
         std::fs::remove_file(&chunk_file(&self.chunks, id))?;
         Ok(())
     }
 }
 
-fn chunk_file(root: &Path, id: StreamId) -> PathBuf {
+fn chunk_file(root: &Path, id: &StreamId) -> PathBuf {
     let hash = blake3::hash(&id.to_bytes()[..]);
     let mut h = [0; 64];
     hex::encode_to_slice(hash.as_bytes(), &mut h).unwrap();
     let hex = std::str::from_utf8(&h[..]).unwrap();
     root.join(&hex[..2]).join(hex)
-}
-
-fn open_nodes(db: &sled::Db, id: StreamId) -> Result<NodeStorage> {
-    let tree = db.open_tree(id.to_bytes())?;
-    Ok(NodeStorage::new(tree))
 }
 
 #[cfg(test)]

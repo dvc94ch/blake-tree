@@ -1,10 +1,10 @@
-use crate::{NodeStorage, Range, Result, Tree, CHUNK_SIZE};
+use crate::{Hash, Insertion, Mime, Range, Result, StreamId, Tree, CHUNK_SIZE};
 use std::io::Write;
 
 #[derive(Clone)]
 pub struct TreeHasher {
-    storage: NodeStorage,
-    stack: Vec<Tree>,
+    batch: Vec<Insertion>,
+    stack: Vec<Hash>,
     chunk: [u8; 1024],
     chunk_length: usize,
     length: u64,
@@ -12,9 +12,9 @@ pub struct TreeHasher {
 }
 
 impl TreeHasher {
-    pub fn new(storage: NodeStorage) -> Self {
+    pub fn new() -> Self {
         Self {
-            storage,
+            batch: vec![],
             stack: vec![],
             chunk: [0; 1024],
             chunk_length: 0,
@@ -40,26 +40,18 @@ impl TreeHasher {
         let hash = blake3::guts::ChunkState::new(range.index())
             .update(&self.chunk[..self.chunk_length])
             .finalize(is_root);
-        let mut right = Tree::chunk(self.storage.clone(), hash, range, is_root)?;
+        self.batch.push(Insertion::Chunk(hash));
         self.chunks += 1;
         self.chunk_length = 0;
 
+        let mut right = hash;
         let mut total_chunks = self.chunks;
         while total_chunks & 1 == 0 {
             let left = self.stack.pop().unwrap();
             let is_root = finalize && self.stack.is_empty();
-            let hash = blake3::guts::parent_cv(left.hash(), right.hash(), is_root);
-            let offset = left.range().offset();
-            let length = left.range().length() + right.range().length();
-            let range = Range::new(offset, length);
-            right = Tree::subtree(
-                self.storage.clone(),
-                hash,
-                range,
-                is_root,
-                *left.hash(),
-                *right.hash(),
-            )?;
+            let hash = blake3::guts::parent_cv(&left, &right, is_root);
+            self.batch.push(Insertion::Parent(hash, left, right));
+            right = hash;
             total_chunks >>= 1;
         }
         self.stack.push(right);
@@ -78,26 +70,20 @@ impl TreeHasher {
         Ok(())
     }
 
-    pub fn finalize(&mut self) -> Result<Tree> {
+    pub fn finalize(mut self, db: &sled::Db, mime: Mime) -> Result<Tree> {
         self.end_chunk(true)?;
         let mut right = self.stack.pop().unwrap();
         while !self.stack.is_empty() {
             let left = self.stack.pop().unwrap();
             let is_root = self.stack.is_empty();
-            let hash = blake3::guts::parent_cv(left.hash(), right.hash(), is_root);
-            let offset = left.range().offset();
-            let length = left.range().length() + right.range().length();
-            let range = Range::new(offset, length);
-            right = Tree::subtree(
-                self.storage.clone(),
-                hash,
-                range,
-                is_root,
-                *left.hash(),
-                *right.hash(),
-            )?;
+            let hash = blake3::guts::parent_cv(&left, &right, is_root);
+            self.batch.push(Insertion::Parent(hash, left, right));
+            right = hash;
         }
-        Ok(right)
+        let id = StreamId::new(right, self.length, mime as _);
+        let tree = Tree::open(db, id)?;
+        tree.apply_batch(&self.batch)?;
+        Ok(tree)
     }
 }
 
@@ -113,10 +99,10 @@ impl Write for TreeHasher {
     }
 }
 
-pub fn tree_hash(storage: NodeStorage, bytes: &[u8]) -> Result<Tree> {
-    let mut hasher = TreeHasher::new(storage);
+pub fn tree_hash(db: &sled::Db, bytes: &[u8], mime: Mime) -> Result<Tree> {
+    let mut hasher = TreeHasher::new();
     hasher.update(bytes)?;
-    hasher.finalize()
+    hasher.finalize(db, mime)
 }
 
 #[cfg(test)]
@@ -126,12 +112,12 @@ mod tests {
     #[test]
     fn test_tree_hasher() -> Result<()> {
         let buf = [0x42; 65537];
-        let storage = NodeStorage::memory()?;
+        let db = crate::tests::memory()?;
         for &case in crate::tests::TEST_CASES {
             dbg!(case);
             let bytes = &buf[..(case as _)];
             let hash = blake3::hash(bytes);
-            let tree = tree_hash(storage.clone(), bytes)?;
+            let tree = tree_hash(&db, bytes, Mime::ApplicationOctetStream)?;
             assert_eq!(*tree.hash(), hash);
         }
         Ok(())
