@@ -7,7 +7,7 @@ use tide::security::{CorsMiddleware, Origin};
 #[derive(Parser)]
 struct Opts {
     #[clap(long)]
-    dir: PathBuf,
+    dir: Option<PathBuf>,
     #[clap(long)]
     url: Option<String>,
     //#[clap(long)]
@@ -18,7 +18,14 @@ struct Opts {
 async fn main() -> Result<()> {
     femme::start();
     let opts = Opts::parse();
-    let storage = StreamStorage::new(opts.dir)?;
+    let dir = if let Some(dir) = opts.dir {
+        dir
+    } else {
+        dirs_next::config_dir()
+            .context("no config dir found")?
+            .join("blake-tree-cli")
+    };
+    let storage = StreamStorage::new(dir)?;
 
     if let Some(url) = opts.url {
         let server = blake_tree_http::server(storage).await;
