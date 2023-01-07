@@ -254,10 +254,11 @@ impl Tree {
         range: &Range,
         tree: &mut impl Read,
         chunks: &mut (impl Write + Seek),
+        buffer: &mut [u8; 1024],
     ) -> Result<()> {
         if self.is_chunk() {
             if self.is_missing()? && range.intersects(self.range()) {
-                let chunk = &mut [0; 1024][..self.range().length() as _];
+                let chunk = &mut buffer[..self.range().length() as _];
                 tree.read_exact(chunk)?;
                 let hash = blake3::guts::ChunkState::new(self.range().index())
                     .update(chunk)
@@ -282,10 +283,10 @@ impl Tree {
             self.set_children(&left_hash, &right_hash)?;
             let (left, right) = self.children()?.unwrap();
             if range.intersects(left.range()) {
-                left.inner_decode_range_from(range, tree, chunks)?;
+                left.inner_decode_range_from(range, tree, chunks, buffer)?;
             }
             if range.intersects(right.range()) {
-                right.inner_decode_range_from(range, tree, chunks)?;
+                right.inner_decode_range_from(range, tree, chunks, buffer)?;
             }
         }
         Ok(())
@@ -302,7 +303,8 @@ impl Tree {
         tree.read_exact(&mut length)?;
         let length = u64::from_le_bytes(length);
         anyhow::ensure!(*self.range() == Range::new(0, length));
-        self.inner_decode_range_from(range, tree, chunks)
+        let mut buffer = [0; 1024];
+        self.inner_decode_range_from(range, tree, chunks, &mut buffer)
     }
 
     pub fn decode_range(
@@ -329,13 +331,15 @@ mod tests {
     #[test]
     fn test_tree() -> Result<()> {
         let buf = [0x42; 65537];
-        let db = crate::tests::memory()?;
+        let db0 = crate::tests::memory(0)?;
+        let db1 = crate::tests::memory(1)?;
+        let db2 = crate::tests::memory(2)?;
         for &case in crate::tests::TEST_CASES {
             dbg!(case);
             let bytes = &buf[..(case as _)];
             let mut buffer = vec![];
             let (bao_bytes, bao_hash) = bao::encode::encode(bytes);
-            let tree = tree_hash(&db, bytes, Mime::ApplicationOctetStream)?;
+            let tree = tree_hash(&db0, bytes, Mime::ApplicationOctetStream)?;
             let id = *tree.id();
 
             //dbg!(&tree);
@@ -345,7 +349,7 @@ mod tests {
             assert_eq!(tree.ranges()?, vec![*tree.range()]);
             assert_eq!(tree.missing_ranges()?, vec![]);
 
-            let tree2 = Tree::open(&db, id)?;
+            let tree2 = Tree::open(&db1, id)?;
             assert_eq!(tree2.hash(), &bao_hash);
             assert!(!tree2.complete()?);
             assert_eq!(tree2.length()?, None);
@@ -382,7 +386,7 @@ mod tests {
                 assert_eq!(right_slice, right_slice2);
 
                 buffer.clear();
-                let tree2 = Tree::open(&db, id)?;
+                let tree2 = Tree::open(&db2, id)?;
 
                 tree2.decode_range(&left_range, &left_slice, &mut Cursor::new(&mut buffer))?;
                 assert_eq!(tree2.hash(), &bao_hash);

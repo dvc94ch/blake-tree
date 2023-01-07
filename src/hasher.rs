@@ -112,7 +112,7 @@ mod tests {
     #[test]
     fn test_tree_hasher() -> Result<()> {
         let buf = [0x42; 65537];
-        let db = crate::tests::memory()?;
+        let db = crate::tests::memory(42)?;
         for &case in crate::tests::TEST_CASES {
             dbg!(case);
             let bytes = &buf[..(case as _)];

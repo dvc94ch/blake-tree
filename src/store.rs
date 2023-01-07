@@ -3,50 +3,59 @@ use std::fs::File;
 use std::io::{self, BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
+fn missing_chunk(pos: u64) -> io::Error {
+    io::Error::new(io::ErrorKind::UnexpectedEof, format!("missing chunk at position {}", pos))
+}
+
 pub struct RangeReader {
     chunks: BufReader<File>,
     tree: Tree,
     range: Range,
+    pos: u64,
 }
 
 impl RangeReader {
     fn new(path: &Path, tree: Tree, range: Range) -> Result<Self> {
         anyhow::ensure!(tree.has_range(&range)?);
-        let chunks = BufReader::new(File::open(path)?);
+        let mut chunks = BufReader::new(File::open(path)?);
+        let pos = chunks.seek(SeekFrom::Start(range.offset()))?;
         Ok(Self {
             chunks,
             tree,
             range,
+            pos,
         })
     }
 
     pub fn set_range(&mut self, range: Range) -> Result<()> {
         anyhow::ensure!(self.tree.has_range(&range)?);
         self.range = range;
+        self.pos = self.chunks.seek(SeekFrom::Start(range.offset()))?;
         Ok(())
     }
 }
 
 impl Read for RangeReader {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let pos = self.stream_position()?;
-        let rest = self.range.end() - pos;
+        let rest = self.range.end() - self.pos;
         let n = u64::min(rest, buf.len() as _) as usize;
         if n == 0 {
-            return Err(io::Error::new(io::ErrorKind::UnexpectedEof, ""));
+            return Ok(0);
         }
-        self.chunks.read(&mut buf[..n])
+        let n = self.chunks.read(&mut buf[..n])?;
+        self.pos += n as u64;
+        Ok(n)
     }
 }
 
 impl Seek for RangeReader {
     fn seek(&mut self, from: SeekFrom) -> io::Result<u64> {
-        let pos = self.stream_position()?;
         let current_pos = self.chunks.seek(from)?;
         if current_pos < self.range.offset() || current_pos >= self.range.end() {
-            self.chunks.seek(SeekFrom::Start(pos))?;
-            return Err(io::Error::new(io::ErrorKind::UnexpectedEof, ""));
+            self.chunks.seek(SeekFrom::Start(self.pos))?;
+            return Err(missing_chunk(current_pos));
         }
+        self.pos = current_pos;
         Ok(current_pos)
     }
 }
@@ -85,14 +94,14 @@ impl Stream {
     }
 
     pub fn decode_range_from(&self, range: &Range, from: &mut impl Read) -> Result<()> {
-        let mut chunks = BufWriter::new(File::open(&self.path)?);
+        let mut chunks = BufWriter::new(File::create(&self.path)?);
         self.tree.decode_range_from(range, from, &mut chunks)?;
         chunks.flush()?;
         Ok(())
     }
 
     pub fn decode_range(&self, range: &Range, slice: &[u8]) -> Result<()> {
-        let mut chunks = BufWriter::new(File::open(&self.path)?);
+        let mut chunks = BufWriter::new(File::create(&self.path)?);
         self.tree.decode_range(range, slice, &mut chunks)?;
         chunks.flush()?;
         Ok(())
@@ -115,9 +124,8 @@ pub struct StreamStorage {
 impl StreamStorage {
     pub fn new(path: impl AsRef<Path>) -> Result<Self> {
         let chunks = path.as_ref().join("chunks");
-        let db = path.as_ref().join("trees");
         std::fs::create_dir_all(&chunks)?;
-        let db = sled::open(db)?;
+        let db = sled::open(path)?;
         // TODO: crash recovery
         Ok(Self { chunks, db })
     }
@@ -138,7 +146,8 @@ impl StreamStorage {
         let path = chunk_file(&self.chunks, id);
         if !path.exists() {
             std::fs::create_dir(path.parent().unwrap())?;
-            File::create(&path)?;
+            let f = File::create(&path)?;
+            f.set_len(id.length())?;
         }
         Ok(Stream { tree, path })
     }
@@ -184,21 +193,25 @@ mod tests {
         let range = Range::new(1024, 1024);
         std::fs::write("/tmp/f", &data[..])?;
 
+        std::fs::remove_dir_all("/tmp/store1").ok();
         let store1 = StreamStorage::new("/tmp/store1")?;
         let stream1 = store1.insert("/tmp/f")?;
         let id = stream1.id();
         let slice = stream1.encode_range(&range)?;
+        store1.remove(id)?;
+        std::fs::remove_dir_all("/tmp/store1")?;
 
+        std::fs::remove_dir_all("/tmp/store2").ok();
         let store2 = StreamStorage::new("/tmp/store2")?;
         let stream2 = store2.get(id)?;
         stream2.decode_range(&range, &slice)?;
 
-        let mut buf = Vec::with_capacity(range.length() as _);
-        stream2.read_range(range)?.read_to_end(&mut buf)?;
+        let mut buf = [0; 1024];
+        stream2.read_range(range)?.read_exact(&mut buf)?;
         assert_eq!(buf, [0x42; 1024]);
 
-        store1.remove(id)?;
         store2.remove(id)?;
+        std::fs::remove_dir_all("/tmp/store2")?;
 
         Ok(())
     }

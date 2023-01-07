@@ -45,7 +45,8 @@ mod tests {
         16 * CHUNK_SIZE + 1,
     ];
 
-    pub fn memory() -> Result<sled::Db> {
-        Ok(sled::Config::new().temporary(true).open()?)
+    pub fn memory(i: u8) -> Result<sled::Db> {
+        let path = std::env::temp_dir().join(i.to_string());
+        Ok(sled::Config::new().path(path).temporary(true).open()?)
     }
 }
