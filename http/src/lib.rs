@@ -1,17 +1,20 @@
 use blake_tree::{Mime, Range, Stream, StreamId, StreamStorage};
+use futures::io::BufReader;
 use std::io::Read;
 use std::str::FromStr;
 use std::sync::Arc;
+use tide::http::headers::HeaderName;
 use tide::{Body, Response};
 
 pub async fn server(store: StreamStorage) -> tide::Server<Arc<StreamStorage>> {
     let mut app = tide::with_state(Arc::new(store));
     app.at("/").get(list);
     app.at("/").post(add);
+    app.at("/:id").head(length);
     app.at("/:id").get(read);
     app.at("/:id").delete(remove);
-    app.at("/:id/ranges").post(ranges);
-    app.at("/:id/missing_ranges").post(missing_ranges);
+    app.at("/:id/ranges").get(ranges);
+    app.at("/:id/missing-ranges").get(missing_ranges);
     app
 }
 
@@ -40,12 +43,25 @@ async fn add(mut req: Request) -> tide::Result {
         .build())
 }
 
+async fn length(req: Request) -> tide::Result {
+    let id = stream_id(&req)?;
+    let empty = BufReader::new(futures::io::empty());
+    let mut body = Body::from_reader(empty, Some(id.length() as _));
+    let mime = id.mime().mime();
+    body.set_mime(tide::http::Mime::from_str(mime).unwrap());
+    Ok(Response::builder(200)
+        .header(tide::http::headers::ACCEPT_RANGES, "bytes")
+        .body(body)
+        .build())
+}
+
 async fn read(req: Request) -> tide::Result {
     let stream = stream(&req)?;
-    let range = if let Some(values) = req.header(tide::http::headers::CONTENT_RANGE) {
-        from_content_range(values.get(0).unwrap().as_str())?
+    let (range, status) = if let Some(values) = req.header(HeaderName::from("Range")) {
+        log::info!("Range: {}", values);
+        (from_range(values.get(0).unwrap().as_str())?, 206)
     } else {
-        stream.id().range()
+        (stream.id().range(), 200)
     };
     let mut reader = stream
         .read_range(range)
@@ -57,7 +73,7 @@ async fn read(req: Request) -> tide::Result {
     let mut body = Body::from_bytes(bytes);
     let mime = stream.id().mime().mime();
     body.set_mime(tide::http::Mime::from_str(mime).unwrap());
-    Ok(Response::builder(200)
+    Ok(Response::builder(status)
         .header(tide::http::headers::CONTENT_RANGE, to_content_range(&range))
         .body(body)
         .build())
@@ -108,24 +124,20 @@ fn stream(req: &Request) -> Result<Stream, tide::Error> {
     store.get(&id).map_err(|err| tide::Error::new(500, err))
 }
 
-fn from_content_range(range: &str) -> Result<Range, tide::Error> {
-    let (unit, rest) = range.split_once(' ').ok_or_else(invalid_content_range)?;
+fn from_range(range: &str) -> Result<Range, tide::Error> {
+    let (unit, range) = range.split_once('=').ok_or_else(invalid_range)?;
     if unit != "bytes" {
-        return Err(invalid_content_range());
+        return Err(invalid_range());
     }
-    let (range, length) = rest.split_once('/').ok_or_else(invalid_content_range)?;
-    let length: u64 = length.parse().map_err(|_| invalid_content_range())?;
-    let (start, end) = range.split_once('-').ok_or_else(invalid_content_range)?;
-    let start: u64 = start.parse().map_err(|_| invalid_content_range())?;
-    let end: u64 = end.parse().map_err(|_| invalid_content_range())?;
-    if end - start != length {
-        return Err(invalid_content_range());
-    }
+    let (start, end) = range.split_once('-').ok_or_else(invalid_range)?;
+    let start: u64 = start.parse().map_err(|_| invalid_range())?;
+    let end: u64 = end.parse().map_err(|_| invalid_range())?;
+    let length = end.checked_sub(start).ok_or_else(invalid_range)?;
     Ok(Range::new(start, length))
 }
 
-fn invalid_content_range() -> tide::Error {
-    tide::Error::new(400, anyhow::anyhow!("invalid content-range"))
+fn invalid_range() -> tide::Error {
+    tide::Error::new(400, anyhow::anyhow!("invalid range"))
 }
 
 fn to_content_range(range: &Range) -> String {
