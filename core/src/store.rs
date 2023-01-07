@@ -4,7 +4,10 @@ use std::io::{self, BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
 fn missing_chunk(pos: u64) -> io::Error {
-    io::Error::new(io::ErrorKind::UnexpectedEof, format!("missing chunk at position {}", pos))
+    io::Error::new(
+        io::ErrorKind::UnexpectedEof,
+        format!("missing chunk at position {}", pos),
+    )
 }
 
 pub struct RangeReader {
@@ -116,6 +119,7 @@ impl Stream {
     }
 }
 
+#[derive(Clone)]
 pub struct StreamStorage {
     chunks: PathBuf,
     db: sled::Db,
