@@ -1,0 +1,8 @@
+[package]
+name = "blake-tree-http"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+blake-tree = { version = "0.1", path = "../core" }
+tide = "0.16.0"

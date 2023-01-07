@@ -1,5 +1,7 @@
 [workspace]
 members = [
+    "cli",
     "core",
+    "http",
 ]
 resolver = "2"
