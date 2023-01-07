@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+anyhow = "1.0.68"
 blake-tree = { version = "0.1", path = "../core" }
 tide = "0.16.0"

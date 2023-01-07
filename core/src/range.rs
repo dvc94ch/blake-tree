@@ -1,6 +1,7 @@
 use crate::CHUNK_SIZE;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize)]
 pub struct Range {
     offset: u64,
     length: u64,

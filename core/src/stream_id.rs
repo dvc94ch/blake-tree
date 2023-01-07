@@ -3,6 +3,7 @@ use base64::{
     alphabet,
     engine::fast_portable::{self, FastPortable},
 };
+use serde::{Serialize, Serializer};
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
@@ -115,6 +116,15 @@ impl std::str::FromStr for StreamId {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::from_base64(s.as_bytes())
+    }
+}
+
+impl Serialize for StreamId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
     }
 }
 

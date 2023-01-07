@@ -156,20 +156,34 @@ impl StreamStorage {
         Ok(Stream { tree, path })
     }
 
-    pub fn insert(&self, path: impl AsRef<Path>) -> Result<Stream> {
+    pub fn insert_path(&self, path: impl AsRef<Path>) -> Result<Stream> {
         let path = path.as_ref();
         let mime = Mime::from_path(path).unwrap_or_default();
+        let mut reader = BufReader::new(File::open(path)?);
+        self.insert(mime, &mut reader)
+    }
 
-        let mut input = BufReader::new(File::open(path)?);
+    pub fn insert(&self, mime: Mime, reader: &mut impl Read) -> Result<Stream> {
+        let mut randomness = [0; 8];
+        getrandom::getrandom(&mut randomness).unwrap();
+        let mut file_name = [0; 16];
+        hex::encode_to_slice(&randomness, &mut file_name).unwrap();
+        let tmp = self
+            .chunks
+            .join(std::str::from_utf8(&file_name[..]).unwrap());
+
+        let mut chunks = BufWriter::new(File::create(&tmp)?);
         let mut hasher = TreeHasher::new();
-        std::io::copy(&mut input, &mut hasher)?;
+        let mut writers = TwoWriters(&mut chunks, &mut hasher);
+        std::io::copy(reader, &mut writers)?;
+        writers.flush()?;
         let tree = hasher.finalize(&self.db, mime)?;
 
-        let output = chunk_file(&self.chunks, tree.id());
-        std::fs::create_dir(output.parent().unwrap())?;
-        std::fs::copy(path, &output)?;
+        let path = chunk_file(&self.chunks, tree.id());
+        std::fs::create_dir(path.parent().unwrap())?;
+        std::fs::copy(tmp, &path)?;
 
-        Ok(Stream { tree, path: output })
+        Ok(Stream { tree, path })
     }
 
     pub fn remove(&self, id: &StreamId) -> Result<()> {
@@ -187,6 +201,22 @@ fn chunk_file(root: &Path, id: &StreamId) -> PathBuf {
     root.join(&hex[..2]).join(hex)
 }
 
+struct TwoWriters<W1, W2>(W1, W2);
+
+impl<W1: Write, W2: Write> Write for TwoWriters<W1, W2> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let n = self.0.write(buf)?;
+        self.1.write_all(&buf[..n])?;
+        Ok(n)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.0.flush()?;
+        self.1.flush()?;
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -199,7 +229,7 @@ mod tests {
 
         std::fs::remove_dir_all("/tmp/store1").ok();
         let store1 = StreamStorage::new("/tmp/store1")?;
-        let stream1 = store1.insert("/tmp/f")?;
+        let stream1 = store1.insert_path("/tmp/f")?;
         let id = stream1.id();
         let slice = stream1.encode_range(&range)?;
         store1.remove(id)?;
