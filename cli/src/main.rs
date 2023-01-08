@@ -35,10 +35,15 @@ async fn main() -> Result<()> {
     let storage = StreamStorage::new(dir)?;
     let mut joins = Vec::with_capacity(2);
     if let Some(url) = opts.url {
-        joins.push(tokio::task::spawn(blake_tree_http::blake_tree_http(storage.clone(), url)));
+        joins.push(tokio::task::spawn(blake_tree_http::blake_tree_http(
+            storage.clone(),
+            url,
+        )));
     }
     if let Some(dev_fuse) = dev_fuse {
-        joins.push(tokio::task::spawn_blocking(|| blake_tree_fuse::blake_tree_fuse(storage, dev_fuse)));
+        joins.push(tokio::task::spawn_blocking(|| {
+            blake_tree_fuse::blake_tree_fuse(storage, dev_fuse)
+        }));
     }
     futures::future::select_all(joins).await.0??;
     Ok(())

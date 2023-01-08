@@ -6,3 +6,6 @@ members = [
     "http",
 ]
 resolver = "2"
+
+[patch.'https://github.com/jmillikin/rust-fuse']
+fuse = { path = "../rust-fuse/fuse" }

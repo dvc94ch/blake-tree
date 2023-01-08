@@ -9,3 +9,4 @@ blake-tree = { version = "0.1", path = "../core" }
 fuse = { version = "0.0.1", git = "https://github.com/jmillikin/rust-fuse" }
 fuse-libc = { version = "0.0.1", git = "https://github.com/jmillikin/rust-fuse" }
 libc = "0.2.139"
+log = "0.4.17"
