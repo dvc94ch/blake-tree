@@ -1,9 +1,11 @@
+use anyhow::{Context, Result};
 use blake_tree::{Mime, Range, Stream, StreamId, StreamStorage};
 use futures::io::BufReader;
 use std::io::Read;
 use std::str::FromStr;
 use std::sync::Arc;
 use tide::http::headers::HeaderName;
+use tide::security::{CorsMiddleware, Origin};
 use tide::{Body, Response};
 
 pub async fn server(store: StreamStorage) -> tide::Server<Arc<StreamStorage>> {
@@ -16,6 +18,23 @@ pub async fn server(store: StreamStorage) -> tide::Server<Arc<StreamStorage>> {
     app.at("/:id/ranges").get(ranges);
     app.at("/:id/missing-ranges").get(missing_ranges);
     app
+}
+
+pub async fn blake_tree_http(store: StreamStorage, url: String) -> Result<()> {
+    let server = server(store).await;
+
+    let cors = CorsMiddleware::new()
+        .allow_origin(Origin::from("*"))
+        .allow_credentials(false);
+
+    let mut app = tide::new();
+    app.with(tide::log::LogMiddleware::new());
+    app.with(cors);
+    app.at("/").nest(server);
+    app.listen(&url)
+        .await
+        .with_context(|| format!("listening on {}", &url))?;
+    Ok(())
 }
 
 type Request = tide::Request<Arc<StreamStorage>>;

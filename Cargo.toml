@@ -2,6 +2,7 @@
 members = [
     "cli",
     "core",
+    "fuse",
     "http",
 ]
 resolver = "2"

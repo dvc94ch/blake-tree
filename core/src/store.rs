@@ -181,7 +181,7 @@ impl StreamStorage {
 
         let path = chunk_file(&self.chunks, tree.id());
         std::fs::create_dir(path.parent().unwrap())?;
-        std::fs::copy(tmp, &path)?;
+        std::fs::rename(tmp, &path)?;
 
         Ok(Stream { tree, path })
     }

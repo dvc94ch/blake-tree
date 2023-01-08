@@ -1,0 +1,11 @@
+[package]
+name = "blake-tree-fuse"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.68"
+blake-tree = { version = "0.1", path = "../core" }
+fuse = { version = "0.0.1", git = "https://github.com/jmillikin/rust-fuse" }
+fuse-libc = { version = "0.0.1", git = "https://github.com/jmillikin/rust-fuse" }
+libc = "0.2.139"
