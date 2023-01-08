@@ -113,7 +113,7 @@ impl<S: FuseSocket> fuse_rpc::Handlers<S> for FuseFs {
             let name = id.to_string();
             let mut entry = ReaddirEntry::new(
                 node::Id::new(i as u64 + 2).unwrap(),
-                &node::Name::new(&name).unwrap(),
+                node::Name::new(&name).unwrap(),
                 // node offset
                 NonZeroU64::new(i as u64 + 1).unwrap(),
             );

@@ -11,6 +11,12 @@ pub struct TreeHasher {
     chunks: usize,
 }
 
+impl Default for TreeHasher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TreeHasher {
     pub fn new() -> Self {
         Self {

@@ -154,7 +154,7 @@ impl Tree {
     }
 
     fn inner_ranges(&self, ranges: &mut Vec<Range>) -> Result<()> {
-        Ok(if let Some((left, right)) = self.children()? {
+        if let Some((left, right)) = self.children()? {
             left.inner_ranges(ranges)?;
             right.inner_ranges(ranges)?;
         } else if self.data()? {
@@ -165,7 +165,8 @@ impl Tree {
                 }
             }
             ranges.push(*self.range());
-        })
+        }
+        Ok(())
     }
 
     pub fn ranges(&self) -> Result<Vec<Range>> {
@@ -175,7 +176,7 @@ impl Tree {
     }
 
     fn inner_missing_ranges(&self, ranges: &mut Vec<Range>) -> Result<()> {
-        Ok(if let Some((left, right)) = self.children()? {
+        if let Some((left, right)) = self.children()? {
             left.inner_missing_ranges(ranges)?;
             right.inner_missing_ranges(ranges)?;
         } else if self.is_missing()? {
@@ -186,7 +187,8 @@ impl Tree {
                 }
             }
             ranges.push(*self.range());
-        })
+        }
+        Ok(())
     }
 
     pub fn missing_ranges(&self) -> Result<Vec<Range>> {

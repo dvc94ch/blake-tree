@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 fn missing_chunk(pos: u64) -> io::Error {
     io::Error::new(
         io::ErrorKind::UnexpectedEof,
-        format!("missing chunk at position {}", pos),
+        format!("missing chunk at position {pos}"),
     )
 }
 
@@ -167,7 +167,7 @@ impl StreamStorage {
         let mut randomness = [0; 8];
         getrandom::getrandom(&mut randomness).unwrap();
         let mut file_name = [0; 16];
-        hex::encode_to_slice(&randomness, &mut file_name).unwrap();
+        hex::encode_to_slice(randomness, &mut file_name).unwrap();
         let tmp = self
             .chunks
             .join(std::str::from_utf8(&file_name[..]).unwrap());
@@ -188,7 +188,7 @@ impl StreamStorage {
 
     pub fn remove(&self, id: &StreamId) -> Result<()> {
         self.db.drop_tree(id.to_bytes())?;
-        std::fs::remove_file(&chunk_file(&self.chunks, id))?;
+        std::fs::remove_file(chunk_file(&self.chunks, id))?;
         Ok(())
     }
 }
