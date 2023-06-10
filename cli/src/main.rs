@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use blake_tree::{Range, StreamId, StreamStorage};
 use clap::Parser;
 use std::path::PathBuf;
+use url::Url;
 
 #[derive(Parser)]
 struct Opts {
@@ -24,7 +25,7 @@ enum Command {
 
 #[derive(Parser)]
 struct CreateOpts {
-    path: PathBuf,
+    url: Url,
 }
 
 #[derive(Parser)]
@@ -62,8 +63,19 @@ async fn main() -> Result<()> {
         Command::List => {
             print_streams(storage.streams());
         }
-        Command::Create(CreateOpts { path }) => {
-            let stream = storage.insert_path(&path)?;
+        Command::Create(CreateOpts { url }) => {
+            let stream = if url.scheme() == "file" {
+                storage.insert_path(&url.path())?
+            } else {
+                let mut res = surf::get(url).await.map_err(|err| err.into_inner())?;
+                let mime = blake_tree_http::to_mime(res.content_type())?;
+                let reader = res
+                    .take_body()
+                    .into_bytes()
+                    .await
+                    .map_err(|err| err.into_inner())?;
+                storage.insert(mime, &mut &reader[..])?
+            };
             print_streams(std::iter::once(*stream.id()));
         }
         Command::Read(RangeOpts { stream }) => {

@@ -32,6 +32,14 @@ fn html_body(body: &str) -> Body {
     body
 }
 
+pub fn to_mime(mime: Option<tide::http::Mime>) -> Result<Mime> {
+    if let Some(mime) = mime {
+        Mime::from_mime(mime.essence()).context("unsupported mime type")
+    } else {
+        Ok(Mime::default())
+    }
+}
+
 pub async fn server(store: StreamStorage) -> tide::Server<Arc<StreamStorage>> {
     let mut app = tide::with_state(Arc::new(store));
     app.at("/").get(list);
@@ -92,12 +100,7 @@ async fn list(req: Request) -> tide::Result {
 }
 
 async fn add(mut req: Request) -> tide::Result {
-    let mime = if let Some(mime) = req.content_type() {
-        Mime::from_mime(mime.essence())
-            .ok_or_else(|| tide::Error::new(400, anyhow::anyhow!("unsupported mime type")))?
-    } else {
-        Mime::default()
-    };
+    let mime = to_mime(req.content_type()).map_err(|err| tide::Error::new(400, err))?;
     let body = req.body_bytes().await?;
     let store = req.state();
     let stream = store.insert(mime, &mut &body[..])?;

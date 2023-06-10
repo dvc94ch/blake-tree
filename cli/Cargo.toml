@@ -14,4 +14,6 @@ dirs-next = "2.0.0"
 env_logger = "0.10.0"
 futures = "0.3.28"
 log = "0.4.18"
+surf = { version = "2.3.2", default-features = false, features = ["h1-client-rustls"] }
 tokio = { version = "1.28.2", features = ["macros", "rt-multi-thread"] }
+url = "2.4.0"
