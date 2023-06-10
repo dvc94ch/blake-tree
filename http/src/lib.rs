@@ -8,6 +8,29 @@ use tide::http::headers::HeaderName;
 use tide::security::{CorsMiddleware, Origin};
 use tide::{Body, Response};
 
+fn html_body(body: &str) -> Body {
+    let html = format!(
+        r#"
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Streams</title>
+        <meta content="text/html;charset=utf-8" http-equiv="Content-Type" />
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta charset="UTF-8" />
+    </head>
+    <body>
+        {}
+    </body>
+</html>
+"#,
+        body
+    );
+    let mut body = Body::from_string(html);
+    body.set_mime("text/html");
+    body
+}
+
 pub async fn server(store: StreamStorage) -> tide::Server<Arc<StreamStorage>> {
     let mut app = tide::with_state(Arc::new(store));
     app.at("/").get(list);
@@ -42,9 +65,29 @@ type Request = tide::Request<Arc<StreamStorage>>;
 async fn list(req: Request) -> tide::Result {
     let store = req.state();
     let streams = store.streams().collect::<Vec<_>>();
-    Ok(Response::builder(200)
-        .body(Body::from_json(&streams)?)
-        .build())
+    let mut json = false;
+    if let Some(values) = req.header(tide::http::headers::ACCEPT) {
+        log::info!("Accept: {}", values);
+        if values.get(0).unwrap().as_str() == "application/json" {
+            json = true;
+        }
+    }
+    let body = if json {
+        Body::from_json(&streams)?
+    } else {
+        let mut body = String::new();
+        body.push_str("<table><tr><th>Stream</th><th>Length</th><th>Mime</th></tr>");
+        for stream in streams {
+            body.push_str("<tr>");
+            body.push_str(&format!(r#"<td><a href="{0}">{0}</a></td>"#, stream));
+            body.push_str(&format!("<td>{}</td>", stream.length()));
+            body.push_str(&format!("<td>{}</td>", stream.mime()));
+            body.push_str("</tr>");
+        }
+        body.push_str("</table>");
+        html_body(&body)
+    };
+    Ok(Response::builder(200).body(body).build())
 }
 
 async fn add(mut req: Request) -> tide::Result {

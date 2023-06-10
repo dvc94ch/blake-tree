@@ -2,13 +2,13 @@
 
 ## List streams (GET /)
 ```
-curl http://127.0.0.1:3000/
+curl -H "Accept: application/json" http://127.0.0.1:3000/
 ["AGbP8Ns5JCMucflZKtyqF-i3wmlWBONmf1LH1-vIyzWg7wQAAAAAAAAmAA=="]
 ```
 
 ## Create stream (POST /)
 ```
-curl -d @/tmp/f -H "Content-Type: application/octet-stream"  http://127.0.0.1:3000/
+curl -d @/tmp/f -H "Content-Type: application/octet-stream" http://127.0.0.1:3000/
 "ALc65rWQ41E9B2VbeW_HyDfZ508Sl3ryKezYZElU9O3iAQgAAAAAAAAAAA=="
 ```
 
