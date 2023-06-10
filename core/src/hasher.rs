@@ -65,8 +65,11 @@ impl TreeHasher {
     }
 
     pub fn update(&mut self, mut bytes: &[u8]) -> Result<()> {
-        let split = CHUNK_SIZE as usize - self.chunk_length;
-        while split < bytes.len() as _ {
+        loop {
+            let split = CHUNK_SIZE as usize - self.chunk_length;
+            if split > bytes.len() {
+                break;
+            }
             let (chunk, rest) = bytes.split_at(split);
             self.fill_chunk(chunk);
             bytes = rest;
