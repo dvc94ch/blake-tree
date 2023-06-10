@@ -18,6 +18,7 @@ fn html_body(body: &str) -> Body {
         <meta content="text/html;charset=utf-8" http-equiv="Content-Type" />
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta charset="UTF-8" />
+        <style>body {{ font-family: monospace; }}</style>
     </head>
     <body>
         {}
@@ -121,10 +122,14 @@ async fn read(req: Request) -> tide::Result {
     let stream = stream(&req)?;
     let (range, status) = if let Some(values) = req.header(HeaderName::from("Range")) {
         log::info!("Range: {}", values);
-        (from_range(values.get(0).unwrap().as_str())?, 206)
+        (
+            from_range(values.get(0).unwrap().as_str(), stream.id().length())?,
+            206,
+        )
     } else {
         (stream.id().range(), 200)
     };
+    log::info!("read range {}", range);
     let mut reader = stream
         .read_range(range)
         .map_err(|err| tide::Error::new(500, err))?;
@@ -136,6 +141,7 @@ async fn read(req: Request) -> tide::Result {
     let mime = stream.id().mime().mime();
     body.set_mime(tide::http::Mime::from_str(mime).unwrap());
     Ok(Response::builder(status)
+        .header(tide::http::headers::ACCEPT_RANGES, "bytes")
         .header(tide::http::headers::CONTENT_RANGE, to_content_range(&range))
         .body(body)
         .build())
@@ -186,14 +192,18 @@ fn stream(req: &Request) -> Result<Stream, tide::Error> {
     store.get(&id).map_err(|err| tide::Error::new(500, err))
 }
 
-fn from_range(range: &str) -> Result<Range, tide::Error> {
+fn from_range(range: &str, length: u64) -> Result<Range, tide::Error> {
     let (unit, range) = range.split_once('=').ok_or_else(invalid_range)?;
     if unit != "bytes" {
         return Err(invalid_range());
     }
     let (start, end) = range.split_once('-').ok_or_else(invalid_range)?;
     let start: u64 = start.parse().map_err(|_| invalid_range())?;
-    let end: u64 = end.parse().map_err(|_| invalid_range())?;
+    let end: u64 = if end == "" {
+        start + length
+    } else {
+        end.parse().map_err(|_| invalid_range())?
+    };
     let length = end.checked_sub(start).ok_or_else(invalid_range)?;
     Ok(Range::new(start, length))
 }
@@ -206,7 +216,7 @@ fn to_content_range(range: &Range) -> String {
     format!(
         "bytes {}-{}/{}",
         range.offset(),
-        range.end(),
+        range.end().saturating_sub(1),
         range.length()
     )
 }
