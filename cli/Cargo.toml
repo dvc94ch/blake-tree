@@ -4,14 +4,14 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.68"
+anyhow = "1.0.71"
 blake-tree = { version = "0.1", path = "../core" }
 blake-tree-fuse = { version = "0.1", path = "../fuse" }
 blake-tree-http = { version = "0.1", path = "../http" }
 caps = "0.5.5"
-clap = { version = "4.0.32", features = ["derive"] }
+clap = { version = "4.3.3", features = ["derive"] }
 dirs-next = "2.0.0"
-femme = "2.2.1"
-futures = "0.3.25"
-log = "0.4.17"
-tokio = { version = "1.24.1", features = ["macros", "rt-multi-thread"] }
+env_logger = "0.10.0"
+futures = "0.3.28"
+log = "0.4.18"
+tokio = { version = "1.28.2", features = ["macros", "rt-multi-thread"] }

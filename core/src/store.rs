@@ -180,7 +180,7 @@ impl StreamStorage {
         let tree = hasher.finalize(&self.db, mime)?;
 
         let path = chunk_file(&self.chunks, tree.id());
-        std::fs::create_dir(path.parent().unwrap())?;
+        std::fs::create_dir(path.parent().unwrap()).ok();
         std::fs::rename(tmp, &path)?;
 
         Ok(Stream { tree, path })
@@ -223,6 +223,7 @@ mod tests {
 
     #[test]
     fn test_store() -> Result<()> {
+        env_logger::try_init().ok();
         let data = [0x42; 2049];
         let range = Range::new(1024, 1024);
         std::fs::write("/tmp/f", &data[..])?;

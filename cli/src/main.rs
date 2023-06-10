@@ -48,7 +48,7 @@ struct SpawnOpts {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    femme::start();
+    env_logger::init();
     let opts = Opts::parse();
     let dir = if let Some(dir) = opts.dir {
         dir

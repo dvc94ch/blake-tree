@@ -1,14 +1,12 @@
 use crate::{Hash, Mime, Range, Result};
-use base64::{
-    alphabet,
-    engine::fast_portable::{self, FastPortable},
-};
+use base64::engine::general_purpose::{GeneralPurpose, PAD};
+use base64::{alphabet, Engine};
 use serde::{Serialize, Serializer};
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 
-const BASE64_ENGINE: FastPortable = FastPortable::from(&alphabet::URL_SAFE, fast_portable::PAD);
+const BASE64_ENGINE: GeneralPurpose = GeneralPurpose::new(&alphabet::URL_SAFE, PAD);
 const BYTES_LENGTH: usize = 43;
 const BASE64_LENGTH: usize = 60;
 
@@ -86,14 +84,17 @@ impl StreamId {
     pub fn from_base64(bytes64: &[u8]) -> Result<Self> {
         anyhow::ensure!(bytes64.len() == BASE64_LENGTH);
         let mut bytes = [0; BYTES_LENGTH];
-        base64::decode_engine_slice(bytes64, &mut bytes, &BASE64_ENGINE)?;
+        BASE64_ENGINE.decode_slice_unchecked(bytes64, &mut bytes)?;
         Self::from_bytes(&bytes[..])
     }
 
     pub fn to_base64(self) -> [u8; BASE64_LENGTH] {
         let bytes = self.to_bytes();
+        debug_assert_eq!(bytes.len(), BYTES_LENGTH);
         let mut bytes64 = [0; BASE64_LENGTH];
-        base64::encode_engine_slice(&bytes[..], &mut bytes64, &BASE64_ENGINE);
+        BASE64_ENGINE
+            .encode_slice(&bytes[..], &mut bytes64)
+            .unwrap();
         bytes64
     }
 }
@@ -135,7 +136,9 @@ mod tests {
     #[test]
     fn test_from_str_fmt() {
         let id = StreamId::new(blake3::hash(b""), 42, Mime::ApplicationTar as _);
-        let id2: StreamId = id.to_string().parse().unwrap();
+        let s = id.to_string();
+        println!("{}", s);
+        let id2: StreamId = s.parse().unwrap();
         assert_eq!(id2, id);
     }
 }
