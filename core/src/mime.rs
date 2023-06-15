@@ -124,6 +124,12 @@ static MIME_DB: &[(Mime, MimeType, &str, &str)] = &[
     (Mime::VideoWebm, MimeType::Video, "video/webm", "webm"),
     (Mime::Video3gpp, MimeType::Video, "video/3gpp", "3gp"),
     (Mime::Video3gpp2, MimeType::Video, "video/3gpp2", "3g2"),
+    (
+        Mime::ApplicationDash,
+        MimeType::Application,
+        "application/dash+xml",
+        "mpd",
+    ),
 ];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
@@ -181,6 +187,8 @@ pub enum Mime {
     VideoWebm,
     Video3gpp,
     Video3gpp2,
+
+    ApplicationDash,
 }
 
 impl Mime {
