@@ -25,7 +25,27 @@ enum Command {
 
 #[derive(Parser)]
 struct CreateOpts {
-    url: Url,
+    file: File,
+    #[clap(short)]
+    quiet: bool,
+}
+
+#[derive(Clone)]
+enum File {
+    Url(Url),
+    Path(PathBuf),
+}
+
+impl std::str::FromStr for File {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        Ok(if s.starts_with("http://") || s.starts_with("https://") {
+            Self::Url(s.parse()?)
+        } else {
+            Self::Path(s.parse()?)
+        })
+    }
 }
 
 #[derive(Parser)]
@@ -63,20 +83,25 @@ async fn main() -> Result<()> {
         Command::List => {
             print_streams(storage.streams());
         }
-        Command::Create(CreateOpts { url }) => {
-            let stream = if url.scheme() == "file" {
-                storage.insert_path(&url.path())?
-            } else {
-                let mut res = surf::get(url).await.map_err(|err| err.into_inner())?;
-                let mime = blake_tree_http::to_mime(res.content_type())?;
-                let reader = res
-                    .take_body()
-                    .into_bytes()
-                    .await
-                    .map_err(|err| err.into_inner())?;
-                storage.insert(mime, &mut &reader[..])?
+        Command::Create(CreateOpts { file, quiet }) => {
+            let stream = match file {
+                File::Path(path) => storage.insert_path(path)?,
+                File::Url(url) => {
+                    let mut res = surf::get(url).await.map_err(|err| err.into_inner())?;
+                    let mime = blake_tree_http::to_mime(res.content_type())?;
+                    let reader = res
+                        .take_body()
+                        .into_bytes()
+                        .await
+                        .map_err(|err| err.into_inner())?;
+                    storage.insert(mime, &mut &reader[..])?
+                }
             };
-            print_streams(std::iter::once(*stream.id()));
+            if quiet {
+                println!("{}", stream.id());
+            } else {
+                print_streams(std::iter::once(*stream.id()));
+            }
         }
         Command::Read(RangeOpts { stream }) => {
             let range = stream.range();
