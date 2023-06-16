@@ -89,17 +89,14 @@ async fn mpd(client: &Client, inputs: &[PathBuf]) -> Result<StreamId> {
     let mut cmd = Command::new("ffmpeg");
     let mut streams = String::new();
     for (i, (path, _)) in inputs.iter().enumerate() {
-        let i = i.to_string();
-        cmd.arg("-f")
-            .arg("webm_dash_manifest")
-            .arg("-i")
-            .arg(path)
-            .arg("-map")
-            .arg(&i);
+        cmd.arg("-f").arg("webm_dash_manifest").arg("-i").arg(path);
         if !streams.is_empty() {
             streams.push(',');
         }
-        streams.push_str(&i);
+        streams.push_str(&i.to_string());
+    }
+    for i in 0..inputs.len() {
+        cmd.arg("-map").arg(&i.to_string());
     }
     cmd.arg("-c")
         .arg("copy")
