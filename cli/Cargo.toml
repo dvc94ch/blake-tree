@@ -1,13 +1,14 @@
 [package]
-name = "blake-tree-cli"
+name = "peershare-cli"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 anyhow = "1.0.71"
-blake-tree = { version = "0.1", path = "../core" }
-blake-tree-fuse = { version = "0.1", path = "../fuse" }
-blake-tree-http = { version = "0.1", path = "../http" }
+peershare-core = { version = "0.1", path = "../core" }
+peershare-fuse = { version = "0.1", path = "../fuse" }
+peershare-http = { version = "0.1", path = "../http" }
+peershare-http-client = { version = "0.1", path = "../http/client" }
 caps = "0.5.5"
 clap = { version = "4.3.3", features = ["derive"] }
 dirs-next = "2.0.0"

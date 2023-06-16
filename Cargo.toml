@@ -4,5 +4,7 @@ members = [
     "core",
     "fuse",
     "http",
+    "http/client",
+    "packager",
 ]
 resolver = "2"

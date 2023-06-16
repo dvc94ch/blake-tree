@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
-use blake_tree::{Range, StreamId, StreamStorage};
 use clap::Parser;
+use peershare_core::{Range, StreamId, StreamStorage};
 use std::path::PathBuf;
 use url::Url;
 
@@ -88,7 +88,7 @@ async fn main() -> Result<()> {
                 File::Path(path) => storage.insert_path(path)?,
                 File::Url(url) => {
                     let mut res = surf::get(url).await.map_err(|err| err.into_inner())?;
-                    let mime = blake_tree_http::to_mime(res.content_type())?;
+                    let mime = peershare_http::to_mime(res.content_type())?;
                     let reader = res
                         .take_body()
                         .into_bytes()
@@ -120,7 +120,7 @@ async fn main() -> Result<()> {
         Command::Spawn(SpawnOpts { url, mount }) => {
             let dev_fuse = if let Some(mount_target) = mount {
                 log::info!("mounting fuse fs at {}", mount_target.display());
-                let socket = blake_tree_fuse::mount(&mount_target)?;
+                let socket = peershare_fuse::mount(&mount_target)?;
                 caps::clear(None, caps::CapSet::Permitted)?;
                 Some(socket)
             } else {
@@ -128,14 +128,14 @@ async fn main() -> Result<()> {
             };
             let mut joins = Vec::with_capacity(2);
             if let Some(url) = url {
-                joins.push(tokio::task::spawn(blake_tree_http::blake_tree_http(
+                joins.push(tokio::task::spawn(peershare_http::blake_tree_http(
                     storage.clone(),
                     url,
                 )));
             }
             if let Some(dev_fuse) = dev_fuse {
                 joins.push(tokio::task::spawn_blocking(|| {
-                    blake_tree_fuse::blake_tree_fuse(storage, dev_fuse)
+                    peershare_fuse::blake_tree_fuse(storage, dev_fuse)
                 }));
             }
             futures::future::select_all(joins).await.0??;

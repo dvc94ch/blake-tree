@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
-use blake_tree::{Mime, Range, Stream, StreamId, StreamStorage};
 use futures::io::BufReader;
+use peershare_core::{Mime, Range, Stream, StreamId, StreamStorage};
 use std::io::Read;
 use std::str::FromStr;
 use std::sync::Arc;

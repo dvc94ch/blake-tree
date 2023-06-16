@@ -1,11 +1,11 @@
 [package]
-name = "blake-tree-fuse"
+name = "peershare-fuse"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 anyhow = "1.0.71"
-blake-tree = { version = "0.1", path = "../core" }
+peershare-core = { version = "0.1", path = "../core" }
 fuse = { version = "0.0.1", git = "https://github.com/jmillikin/rust-fuse" }
 fuse-libc = { version = "0.0.1", git = "https://github.com/jmillikin/rust-fuse" }
 libc = "0.2.146"

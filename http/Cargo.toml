@@ -1,11 +1,11 @@
 [package]
-name = "blake-tree-http"
+name = "peershare-http"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 anyhow = "1.0.71"
-blake-tree = { version = "0.1", path = "../core" }
+peershare-core = { version = "0.1", path = "../core" }
 futures = "0.3.28"
 log = "0.4.18"
 tide = "0.16.0"

@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
-use blake_tree::{Range, StreamId, StreamStorage};
 use fuse::node;
 use fuse::server::fuse_rpc;
 use fuse::server::prelude::*;
+use peershare_core::{Range, StreamId, StreamStorage};
 use std::ffi::CString;
 use std::io::Read;
 use std::num::NonZeroU64;
