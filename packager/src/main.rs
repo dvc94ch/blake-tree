@@ -34,25 +34,22 @@ async fn main() -> Result<()> {
 async fn create_inputs<'a>(
     client: &Client,
     paths: &'a [PathBuf],
-) -> Result<Vec<(&'a Path, StreamId)>> {
+) -> Result<Vec<(&'a str, StreamId)>> {
     let mut inputs = Vec::with_capacity(paths.len());
     for path in paths {
         let data = std::fs::read(path)?;
         let stream = client.create(Mime::VideoWebm, &data).await?;
-        inputs.push((path.as_path(), stream));
+        inputs.push((path.file_name().unwrap().to_str().unwrap(), stream));
     }
     Ok(inputs)
 }
 
-async fn create_mpd(
-    client: &Client,
-    inputs: &[(&Path, StreamId)],
-    path: &Path,
-) -> Result<StreamId> {
+async fn create_mpd(client: &Client, inputs: &[(&str, StreamId)], path: &Path) -> Result<StreamId> {
     let mut mpd = std::fs::read_to_string(path)?;
-    for (path, stream) in inputs {
-        mpd = mpd.replace(path.to_str().unwrap(), &stream.to_string());
+    for (name, stream) in inputs {
+        mpd = mpd.replace(name, &format!("/streams/{stream}"));
     }
+    mpd = mpd.replace(r#"codecs="av1""#, r#"codecs="av01.0.31M.08""#);
     client.create(Mime::ApplicationDash, mpd.as_bytes()).await
 }
 
