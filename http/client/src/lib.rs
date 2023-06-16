@@ -14,7 +14,7 @@ impl Client {
     }
 
     pub async fn list(&self) -> Result<Vec<StreamId>> {
-        let streams: Vec<String> = surf::get(format!("{}/streams", &self.url))
+        let streams: Vec<String> = surf::get(format!("{}streams", &self.url))
             .send()
             .await
             .map_err(|e| e.into_inner())?
@@ -25,7 +25,7 @@ impl Client {
     }
 
     pub async fn create(&self, mime: Mime, data: &[u8]) -> Result<StreamId> {
-        let stream_id: String = surf::post(format!("{}/streams", &self.url))
+        let stream_id: String = surf::post(format!("{}streams", &self.url))
             .body_bytes(data)
             .content_type(mime.to_string().as_str())
             .send()
@@ -38,7 +38,7 @@ impl Client {
     }
 
     pub async fn read(&self, id: StreamId, range: Option<Range>) -> Result<Vec<u8>> {
-        let mut builder = surf::get(format!("{}/streams/{}", &self.url, id));
+        let mut builder = surf::get(format!("{}streams/{}", &self.url, id));
         if let Some(range) = range {
             builder = builder.header(
                 "Range",
@@ -55,7 +55,7 @@ impl Client {
     }
 
     pub async fn ranges(&self, id: StreamId) -> Result<Vec<Range>> {
-        Ok(surf::get(format!("{}/streams/{}/ranges", &self.url, id))
+        Ok(surf::get(format!("{}streams/{}/ranges", &self.url, id))
             .send()
             .await
             .map_err(|e| e.into_inner())?
@@ -66,7 +66,7 @@ impl Client {
 
     pub async fn missing_ranges(&self, id: StreamId) -> Result<Vec<Range>> {
         Ok(
-            surf::get(format!("{}/streams/{}/missing-ranges", &self.url, id))
+            surf::get(format!("{}streams/{}/missing-ranges", &self.url, id))
                 .send()
                 .await
                 .map_err(|e| e.into_inner())?
@@ -77,7 +77,7 @@ impl Client {
     }
 
     pub async fn remove(&self, id: StreamId) -> Result<()> {
-        surf::delete(format!("{}/streams/{}", &self.url, id))
+        surf::delete(format!("{}streams/{}", &self.url, id))
             .send()
             .await
             .map_err(|e| e.into_inner())?;

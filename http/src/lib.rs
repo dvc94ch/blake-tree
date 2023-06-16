@@ -8,7 +8,7 @@ use tide::http::headers::HeaderName;
 use tide::security::{CorsMiddleware, Origin};
 use tide::{Body, Response};
 
-pub fn to_mime(mime: Option<tide::http::Mime>) -> Result<Mime> {
+fn to_mime(mime: Option<tide::http::Mime>) -> Result<Mime> {
     if let Some(mime) = mime {
         Mime::from_mime(mime.essence()).context("unsupported mime type")
     } else {

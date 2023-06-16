@@ -1,14 +1,12 @@
 use anyhow::{Context, Result};
 use clap::Parser;
-use peershare_core::{Mime, Range, StreamId, StreamStorage};
+use peershare_core::{Mime, Range, StreamId};
 use peershare_http_client::Client;
 use std::path::PathBuf;
 use url::Url;
 
 #[derive(Parser)]
 struct Opts {
-    #[clap(long)]
-    dir: Option<PathBuf>,
     #[clap(subcommand)]
     cmd: Command,
     #[clap(long)]
@@ -23,7 +21,6 @@ enum Command {
     Ranges(StreamOpts),
     MissingRanges(StreamOpts),
     Remove(StreamOpts),
-    Spawn(SpawnOpts),
 }
 
 #[derive(Parser)]
@@ -62,12 +59,6 @@ struct StreamOpts {
     stream: StreamId,
 }
 
-#[derive(Parser)]
-struct SpawnOpts {
-    #[clap(long)]
-    mount: Option<PathBuf>,
-}
-
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::init();
@@ -89,7 +80,7 @@ async fn main() -> Result<()> {
                 }
                 File::Url(url) => {
                     let mut res = surf::get(url).await.map_err(|err| err.into_inner())?;
-                    let mime = peershare_http::to_mime(res.content_type())?;
+                    let mime = to_mime(res.content_type())?;
                     let data = res
                         .take_body()
                         .into_bytes()
@@ -120,38 +111,16 @@ async fn main() -> Result<()> {
         Command::Remove(StreamOpts { stream }) => {
             client.remove(stream).await?;
         }
-        Command::Spawn(SpawnOpts { mount }) => {
-            let dir = if let Some(dir) = opts.dir {
-                dir
-            } else {
-                dirs_next::config_dir()
-                    .context("no config dir found")?
-                    .join("peershare")
-            };
-            let storage = StreamStorage::new(dir)?;
-
-            let dev_fuse = if let Some(mount_target) = mount {
-                log::info!("mounting fuse fs at {}", mount_target.display());
-                let socket = peershare_fuse::mount(&mount_target)?;
-                caps::clear(None, caps::CapSet::Permitted)?;
-                Some(socket)
-            } else {
-                None
-            };
-            let mut joins = Vec::with_capacity(2);
-            joins.push(tokio::task::spawn(peershare_http::http(
-                storage.clone(),
-                url,
-            )));
-            if let Some(dev_fuse) = dev_fuse {
-                joins.push(tokio::task::spawn_blocking(|| {
-                    peershare_fuse::fuse(storage, dev_fuse)
-                }));
-            }
-            futures::future::select_all(joins).await.0??;
-        }
     }
     Ok(())
+}
+
+fn to_mime(mime: Option<surf::http::Mime>) -> Result<Mime> {
+    if let Some(mime) = mime {
+        Mime::from_mime(mime.essence()).context("unsupported mime type")
+    } else {
+        Ok(Mime::default())
+    }
 }
 
 fn print_streams(streams: impl Iterator<Item = StreamId>) {

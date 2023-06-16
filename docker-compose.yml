@@ -1,0 +1,23 @@
+version: '3.9'
+volumes:
+  peershare:
+  meilisearch:
+services:
+  peershare:
+    image: 'peershare/peershare'
+    command: '--dir /data --url http://0.0.0.0:3000'
+    environment:
+      RUST_LOG: info
+    ports:
+    - '3000:3000'
+    volumes:
+    - "peershare:/data"
+  meilisearch:
+    image: 'getmeili/meilisearch:v1.2'
+    command: 'meilisearch'
+    environment:
+      MEILI_ENV: development
+    ports:
+    - '7700:7700'
+    volumes:
+    - "meilisearch:/meili_data"

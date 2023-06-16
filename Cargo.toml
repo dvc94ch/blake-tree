@@ -8,3 +8,24 @@ members = [
     "packager",
 ]
 resolver = "2"
+
+[package]
+name = "peershare"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+fuse = ["peershare-fuse"]
+
+[dependencies]
+anyhow = "1.0.71"
+peershare-core = { version = "0.1", path = "core" }
+peershare-fuse = { version = "0.1", path = "fuse", optional = true }
+peershare-http = { version = "0.1", path = "http" }
+caps = "0.5.5"
+clap = { version = "4.3.3", features = ["derive"] }
+dirs-next = "2.0.0"
+env_logger = "0.10.0"
+futures = "0.3.28"
+log = "0.4.18"
+tokio = { version = "1.28.2", features = ["macros", "rt-multi-thread"] }
