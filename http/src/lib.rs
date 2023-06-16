@@ -39,6 +39,8 @@ pub async fn http(store: StreamStorage, url: String) -> Result<()> {
     app.with(tide::log::LogMiddleware::new());
     app.with(cors);
     app.at("/streams").nest(server);
+    app.at("/static").serve_dir("static")?;
+    app.at("/").serve_file("static/index.html")?;
     app.listen(&url)
         .await
         .with_context(|| format!("listening on {}", &url))?;
