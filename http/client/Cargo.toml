@@ -1,0 +1,9 @@
+[package]
+name = "peershare-http-client"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.71"
+peershare-core = { version = "0.1", path = "../../core" }
+surf = { version = "2.3.2", default-features = false, features = ["h1-client-rustls"] }

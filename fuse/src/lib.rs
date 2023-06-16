@@ -305,7 +305,7 @@ pub fn mount(mount_target: &Path) -> Result<fuse_libc::FuseServerSocket> {
         .with_context(|| format!("mounting at {}", mount_target.display()))
 }
 
-pub fn blake_tree_fuse(store: StreamStorage, dev_fuse: fuse_libc::FuseServerSocket) -> Result<()> {
+pub fn fuse(store: StreamStorage, dev_fuse: fuse_libc::FuseServerSocket) -> Result<()> {
     let fs = FuseFs::new(store);
     let conn = FuseServer::new()
         .connect(dev_fuse)

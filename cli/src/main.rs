@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use clap::Parser;
-use peershare_core::{Range, StreamId, StreamStorage};
+use peershare_core::{Mime, Range, StreamId, StreamStorage};
+use peershare_http_client::Client;
 use std::path::PathBuf;
 use url::Url;
 
@@ -10,6 +11,8 @@ struct Opts {
     dir: Option<PathBuf>,
     #[clap(subcommand)]
     cmd: Command,
+    #[clap(long)]
+    url: Option<String>,
 }
 
 #[derive(Parser)]
@@ -62,8 +65,6 @@ struct StreamOpts {
 #[derive(Parser)]
 struct SpawnOpts {
     #[clap(long)]
-    url: Option<String>,
-    #[clap(long)]
     mount: Option<PathBuf>,
 }
 
@@ -71,53 +72,64 @@ struct SpawnOpts {
 async fn main() -> Result<()> {
     env_logger::init();
     let opts = Opts::parse();
-    let dir = if let Some(dir) = opts.dir {
-        dir
-    } else {
-        dirs_next::config_dir()
-            .context("no config dir found")?
-            .join("blake-tree-cli")
-    };
-    let storage = StreamStorage::new(dir)?;
+    let url = opts
+        .url
+        .unwrap_or_else(|| "http://127.0.0.1:3000".to_string());
+    let client = Client::new(&url)?;
     match opts.cmd {
         Command::List => {
-            print_streams(storage.streams());
+            print_streams(client.list().await?.into_iter());
         }
         Command::Create(CreateOpts { file, quiet }) => {
-            let stream = match file {
-                File::Path(path) => storage.insert_path(path)?,
+            let (mime, data) = match file {
+                File::Path(path) => {
+                    let mime = Mime::from_path(&path).unwrap_or_default();
+                    let data = std::fs::read(path)?;
+                    (mime, data)
+                }
                 File::Url(url) => {
                     let mut res = surf::get(url).await.map_err(|err| err.into_inner())?;
                     let mime = peershare_http::to_mime(res.content_type())?;
-                    let reader = res
+                    let data = res
                         .take_body()
                         .into_bytes()
                         .await
                         .map_err(|err| err.into_inner())?;
-                    storage.insert(mime, &mut &reader[..])?
+                    (mime, data)
                 }
             };
+            let stream = client.create(mime, &data).await?;
             if quiet {
-                println!("{}", stream.id());
+                println!("{}", stream);
             } else {
-                print_streams(std::iter::once(*stream.id()));
+                print_streams(std::iter::once(stream));
             }
         }
         Command::Read(RangeOpts { stream }) => {
-            let range = stream.range();
-            let mut reader = storage.get(&stream)?.read_range(range)?;
-            std::io::copy(&mut reader, &mut std::io::stdout())?;
+            let data = client.read(stream, None).await?;
+            std::io::copy(&mut &data[..], &mut std::io::stdout())?;
         }
         Command::Ranges(StreamOpts { stream }) => {
-            print_ranges(storage.get(&stream)?.ranges()?.into_iter());
+            let ranges = client.ranges(stream).await?;
+            print_ranges(ranges.into_iter());
         }
         Command::MissingRanges(StreamOpts { stream }) => {
-            print_ranges(storage.get(&stream)?.missing_ranges()?.into_iter());
+            let ranges = client.missing_ranges(stream).await?;
+            print_ranges(ranges.into_iter());
         }
         Command::Remove(StreamOpts { stream }) => {
-            storage.remove(&stream)?;
+            client.remove(stream).await?;
         }
-        Command::Spawn(SpawnOpts { url, mount }) => {
+        Command::Spawn(SpawnOpts { mount }) => {
+            let dir = if let Some(dir) = opts.dir {
+                dir
+            } else {
+                dirs_next::config_dir()
+                    .context("no config dir found")?
+                    .join("peershare")
+            };
+            let storage = StreamStorage::new(dir)?;
+
             let dev_fuse = if let Some(mount_target) = mount {
                 log::info!("mounting fuse fs at {}", mount_target.display());
                 let socket = peershare_fuse::mount(&mount_target)?;
@@ -127,15 +139,13 @@ async fn main() -> Result<()> {
                 None
             };
             let mut joins = Vec::with_capacity(2);
-            if let Some(url) = url {
-                joins.push(tokio::task::spawn(peershare_http::blake_tree_http(
-                    storage.clone(),
-                    url,
-                )));
-            }
+            joins.push(tokio::task::spawn(peershare_http::http(
+                storage.clone(),
+                url,
+            )));
             if let Some(dev_fuse) = dev_fuse {
                 joins.push(tokio::task::spawn_blocking(|| {
-                    peershare_fuse::blake_tree_fuse(storage, dev_fuse)
+                    peershare_fuse::fuse(storage, dev_fuse)
                 }));
             }
             futures::future::select_all(joins).await.0??;

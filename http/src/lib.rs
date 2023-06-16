@@ -8,30 +8,6 @@ use tide::http::headers::HeaderName;
 use tide::security::{CorsMiddleware, Origin};
 use tide::{Body, Response};
 
-fn html_body(body: &str) -> Body {
-    let html = format!(
-        r#"
-<!DOCTYPE html>
-<html>
-    <head>
-        <title>Streams</title>
-        <meta content="text/html;charset=utf-8" http-equiv="Content-Type" />
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta charset="UTF-8" />
-        <style>body {{ font-family: monospace; }}</style>
-    </head>
-    <body>
-        {}
-    </body>
-</html>
-"#,
-        body
-    );
-    let mut body = Body::from_string(html);
-    body.set_mime("text/html");
-    body
-}
-
 pub fn to_mime(mime: Option<tide::http::Mime>) -> Result<Mime> {
     if let Some(mime) = mime {
         Mime::from_mime(mime.essence()).context("unsupported mime type")
@@ -52,7 +28,7 @@ pub async fn server(store: StreamStorage) -> tide::Server<Arc<StreamStorage>> {
     app
 }
 
-pub async fn blake_tree_http(store: StreamStorage, url: String) -> Result<()> {
+pub async fn http(store: StreamStorage, url: String) -> Result<()> {
     let server = server(store).await;
 
     let cors = CorsMiddleware::new()
@@ -62,7 +38,7 @@ pub async fn blake_tree_http(store: StreamStorage, url: String) -> Result<()> {
     let mut app = tide::new();
     app.with(tide::log::LogMiddleware::new());
     app.with(cors);
-    app.at("/").nest(server);
+    app.at("/streams").nest(server);
     app.listen(&url)
         .await
         .with_context(|| format!("listening on {}", &url))?;
@@ -74,28 +50,7 @@ type Request = tide::Request<Arc<StreamStorage>>;
 async fn list(req: Request) -> tide::Result {
     let store = req.state();
     let streams = store.streams().collect::<Vec<_>>();
-    let mut json = false;
-    if let Some(values) = req.header(tide::http::headers::ACCEPT) {
-        log::info!("Accept: {}", values);
-        if values.get(0).unwrap().as_str() == "application/json" {
-            json = true;
-        }
-    }
-    let body = if json {
-        Body::from_json(&streams)?
-    } else {
-        let mut body = String::new();
-        body.push_str("<table><tr><th>Stream</th><th>Length</th><th>Mime</th></tr>");
-        for stream in streams {
-            body.push_str("<tr>");
-            body.push_str(&format!(r#"<td><a href="{0}">{0}</a></td>"#, stream));
-            body.push_str(&format!("<td>{}</td>", stream.length()));
-            body.push_str(&format!("<td>{}</td>", stream.mime()));
-            body.push_str("</tr>");
-        }
-        body.push_str("</table>");
-        html_body(&body)
-    };
+    let body = Body::from_json(&streams)?;
     Ok(Response::builder(200).body(body).build())
 }
 
