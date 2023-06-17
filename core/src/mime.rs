@@ -130,6 +130,12 @@ static MIME_DB: &[(Mime, MimeType, &str, &str)] = &[
         "application/dash+xml",
         "mpd",
     ),
+    (
+        Mime::ApplicationPeershare,
+        MimeType::Application,
+        "application/x-peershare",
+        "xpsm",
+    ),
 ];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
@@ -189,6 +195,7 @@ pub enum Mime {
     Video3gpp2,
 
     ApplicationDash,
+    ApplicationPeershare,
 }
 
 impl Mime {

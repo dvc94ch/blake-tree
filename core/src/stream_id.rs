@@ -1,14 +1,14 @@
 use crate::{Hash, Mime, Range, Result};
-use base64::engine::general_purpose::{GeneralPurpose, PAD};
+use base64::engine::general_purpose::{GeneralPurpose, NO_PAD};
 use base64::{alphabet, Engine};
-use serde::{Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 
-const BASE64_ENGINE: GeneralPurpose = GeneralPurpose::new(&alphabet::URL_SAFE, PAD);
+const BASE64_ENGINE: GeneralPurpose = GeneralPurpose::new(&alphabet::URL_SAFE, NO_PAD);
 const BYTES_LENGTH: usize = 43;
-const BASE64_LENGTH: usize = 60;
+const BASE64_LENGTH: usize = 58;
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct StreamId {
@@ -126,6 +126,17 @@ impl Serialize for StreamId {
         S: Serializer,
     {
         serializer.serialize_str(&self.to_string())
+    }
+}
+
+impl<'de> Deserialize<'de> for StreamId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        s.parse()
+            .map_err(|err| serde::de::Error::custom(format!("{err}")))
     }
 }
 

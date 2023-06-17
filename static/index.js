@@ -5,20 +5,29 @@ async function fetchStreams() {
     const metadata = await fetch(`/streams/${id}`, {method: "HEAD"});
     const mime = metadata.headers.get("content-type");
     const length = metadata.headers.get("content-length");
-    return {'id': id, 'mime': mime, 'length': length};
+    const url = await streamUrl(id, mime);
+    return {'id': id, 'mime': mime, 'length': length, 'url': url};
   }));
   const table = document.querySelector("#streams");
   streams.forEach(function(stream) {
     const id = stream['id'];
     const mime = stream['mime'];
     const length = stream['length'];
-    const url = streamUrl(id, mime);
+    const url = stream['url'];
     table.innerHTML +=
       `<tr><td><a href="${url}">${id}</a></td><td>${mime}</td><td>${length}</td></tr>`;
   });
 }
 
-function streamUrl(stream, mime) {
+async function streamUrl(stream, mime) {
+  if (mime == "application/x-peershare") {
+    const response = await fetch(`/streams/${stream}`);
+    const manifest = await response.json();
+    const id =  manifest['streamId'];
+    const metadata = await fetch(`/streams/${id}`, {method: "HEAD"});
+    const mime = metadata.headers.get("content-type");
+    return await streamUrl(id, mime);
+  }
   if (mime == "application/dash+xml") {
     return `/player?stream=${stream}`;
   }

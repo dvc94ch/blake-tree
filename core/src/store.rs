@@ -2,6 +2,7 @@ use crate::{Mime, Range, Result, StreamId, Tree, TreeHasher};
 use std::fs::File;
 use std::io::{self, BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 fn missing_chunk(pos: u64) -> io::Error {
     io::Error::new(
@@ -35,6 +36,13 @@ impl RangeReader {
         self.range = range;
         self.pos = self.chunks.seek(SeekFrom::Start(range.offset()))?;
         Ok(())
+    }
+
+    pub fn read_to_vec(&mut self) -> Result<Vec<u8>> {
+        let capacity = self.range.end() - self.pos;
+        let mut bytes = Vec::with_capacity(capacity as _);
+        self.read_to_end(&mut bytes)?;
+        Ok(bytes)
     }
 }
 
@@ -117,12 +125,17 @@ impl Stream {
     pub fn read(&self) -> Result<RangeReader> {
         self.read_range(*self.tree.range())
     }
+
+    pub fn to_vec(&self) -> Result<Vec<u8>> {
+        self.read()?.read_to_vec()
+    }
 }
 
 #[derive(Clone)]
 pub struct StreamStorage {
     chunks: PathBuf,
     db: sled::Db,
+    callback: Option<Arc<dyn Fn(&Self, StreamEvent) + Send + Sync>>,
 }
 
 impl StreamStorage {
@@ -131,7 +144,15 @@ impl StreamStorage {
         std::fs::create_dir_all(&chunks)?;
         let db = sled::open(path)?;
         // TODO: crash recovery
-        Ok(Self { chunks, db })
+        Ok(Self {
+            chunks,
+            db,
+            callback: None,
+        })
+    }
+
+    pub fn set_callback(&mut self, callback: impl Fn(&Self, StreamEvent) + Send + Sync + 'static) {
+        self.callback = Some(Arc::new(callback));
     }
 
     pub fn streams(&self) -> impl Iterator<Item = StreamId> {
@@ -182,6 +203,9 @@ impl StreamStorage {
         let path = chunk_file(&self.chunks, tree.id());
         std::fs::create_dir(path.parent().unwrap()).ok();
         std::fs::rename(tmp, &path)?;
+        if let Some(callback) = self.callback.as_ref() {
+            (callback)(self, StreamEvent::Insert(*tree.id()));
+        }
 
         Ok(Stream { tree, path })
     }
@@ -189,6 +213,9 @@ impl StreamStorage {
     pub fn remove(&self, id: &StreamId) -> Result<()> {
         self.db.drop_tree(id.to_bytes())?;
         std::fs::remove_file(chunk_file(&self.chunks, id))?;
+        if let Some(callback) = self.callback.as_ref() {
+            (callback)(self, StreamEvent::Remove(*id));
+        }
         Ok(())
     }
 }
@@ -215,6 +242,12 @@ impl<W1: Write, W2: Write> Write for TwoWriters<W1, W2> {
         self.1.flush()?;
         Ok(())
     }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum StreamEvent {
+    Insert(StreamId),
+    Remove(StreamId),
 }
 
 #[cfg(test)]

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
-use peershare_core::{Mime, StreamId};
+use peershare_core::{Manifest, Mime, StreamId};
 use peershare_http_client::Client;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -12,6 +12,10 @@ struct Opts {
     url: Option<String>,
     #[clap(long)]
     key: Option<String>,
+    #[clap(long)]
+    metadata: Option<PathBuf>,
+    #[clap(long)]
+    content: Option<PathBuf>,
 }
 
 #[tokio::main]
@@ -27,6 +31,13 @@ async fn main() -> Result<()> {
     } else {
         mpd(&client, &opts.inputs).await?
     };
+    let stream = manifest(
+        &client,
+        stream,
+        opts.metadata.as_deref(),
+        opts.content.as_deref(),
+    )
+    .await?;
     println!("{}", stream);
     Ok(())
 }
@@ -107,4 +118,32 @@ async fn mpd(client: &Client, inputs: &[PathBuf]) -> Result<StreamId> {
         .arg(output);
     anyhow::ensure!(cmd.status()?.success());
     create_mpd(client, &inputs, output).await
+}
+
+async fn manifest(
+    client: &Client,
+    stream_id: StreamId,
+    metadata: Option<&Path>,
+    content: Option<&Path>,
+) -> Result<StreamId> {
+    let metadata = if let Some(path) = metadata {
+        let metadata = std::fs::read_to_string(path)?;
+        serde_json::from_str(&metadata)?
+    } else {
+        Default::default()
+    };
+    let content = if let Some(path) = content {
+        std::fs::read_to_string(path)?
+    } else {
+        Default::default()
+    };
+    let manifest = Manifest {
+        stream_id,
+        metadata,
+        content,
+    };
+    let manifest = serde_json::to_string(&manifest)?;
+    client
+        .create(Mime::ApplicationPeershare, manifest.as_bytes())
+        .await
 }

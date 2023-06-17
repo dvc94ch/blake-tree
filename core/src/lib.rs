@@ -1,4 +1,5 @@
 mod hasher;
+mod manifest;
 mod mime;
 mod range;
 mod store;
@@ -6,9 +7,10 @@ mod stream_id;
 mod tree;
 
 pub use crate::hasher::{tree_hash, TreeHasher};
+pub use crate::manifest::Manifest;
 pub use crate::mime::{Mime, MimeType};
 pub use crate::range::Range;
-pub use crate::store::{RangeReader, Stream, StreamStorage};
+pub use crate::store::{RangeReader, Stream, StreamEvent, StreamStorage};
 pub use crate::stream_id::StreamId;
 pub use crate::tree::{Insertion, Tree};
 pub use anyhow::Result;
