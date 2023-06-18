@@ -99,12 +99,7 @@ impl Meili {
             .await?;
         self.builder(Method::Patch, "/indexes/content/settings")
             .body_json(&json!({
-               "displayedAttributes": [
-                    "streamId",
-                    "title",
-                    "description",
-                    "poster",
-                ],
+               "displayedAttributes": ["*"],
             }))?
             .send()
             .await?;
