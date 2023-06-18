@@ -30,6 +30,8 @@ pub fn prepare_video(input: impl AsRef<Path>, output: impl AsRef<Path>) -> Resul
     let mut cmd = Command::new("av1an");
     cmd.arg("-i")
         .arg(input.as_ref())
+        .arg("-a")
+        .arg(r#""-an""#)
         .arg("-e")
         .arg("rav1e")
         //.arg("--target-quality")

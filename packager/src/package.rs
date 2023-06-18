@@ -7,14 +7,17 @@ use std::process::Command;
 
 #[derive(Parser)]
 pub struct PackageOpts {
-    inputs: Vec<PathBuf>,
-    #[clap(long)]
+    #[clap(short, long)]
+    video: Vec<PathBuf>,
+    #[clap(short, long)]
+    audio: Option<PathBuf>,
+    #[clap(short, long)]
     url: Option<String>,
-    #[clap(long)]
+    #[clap(short, long)]
     key: Option<String>,
-    #[clap(long)]
+    #[clap(short, long)]
     metadata: Option<PathBuf>,
-    #[clap(long)]
+    #[clap(short, long)]
     content: Option<PathBuf>,
 }
 
@@ -24,9 +27,9 @@ pub async fn package(opts: PackageOpts) -> Result<()> {
         .unwrap_or_else(|| "http://127.0.0.1:3000".to_string());
     let client = Client::new(&url)?;
     let stream = if let Some(key) = opts.key {
-        mpd_drm(&client, &opts.inputs, &key).await?
+        mpd_drm(&client, &opts.video, opts.audio.as_deref(), &key).await?
     } else {
-        mpd(&client, &opts.inputs).await?
+        mpd(&client, &opts.video, opts.audio.as_deref()).await?
     };
     let stream = manifest(
         &client,
@@ -39,20 +42,36 @@ pub async fn package(opts: PackageOpts) -> Result<()> {
     Ok(())
 }
 
+async fn create_input<'a>(
+    client: &Client,
+    path: &'a Path,
+    mime: Mime,
+) -> Result<(&'a str, StreamId)> {
+    let data = std::fs::read(path)?;
+    let stream = client.create(mime, &data).await?;
+    Ok((path.file_name().unwrap().to_str().unwrap(), stream))
+}
+
 async fn create_inputs<'a>(
     client: &Client,
-    paths: &'a [PathBuf],
+    video: &'a [PathBuf],
+    audio: Option<&'a Path>,
 ) -> Result<Vec<(&'a str, StreamId)>> {
-    let mut inputs = Vec::with_capacity(paths.len());
-    for path in paths {
-        let data = std::fs::read(path)?;
-        let stream = client.create(Mime::VideoWebm, &data).await?;
-        inputs.push((path.file_name().unwrap().to_str().unwrap(), stream));
+    let mut inputs = Vec::with_capacity(video.len() + 1);
+    for path in video {
+        inputs.push(create_input(client, path, Mime::VideoWebm).await?);
+    }
+    if let Some(path) = audio {
+        inputs.push(create_input(client, path, Mime::AudioWebm).await?);
     }
     Ok(inputs)
 }
 
-async fn create_mpd(client: &Client, inputs: &[(&str, StreamId)], path: &Path) -> Result<StreamId> {
+async fn rewrite_mpd(
+    client: &Client,
+    inputs: &[(&str, StreamId)],
+    path: &Path,
+) -> Result<StreamId> {
     let mut mpd = std::fs::read_to_string(path)?;
     for (name, stream) in inputs {
         mpd = mpd.replace(name, &format!("/streams/{stream}"));
@@ -61,19 +80,34 @@ async fn create_mpd(client: &Client, inputs: &[(&str, StreamId)], path: &Path) -
     client.create(Mime::ApplicationDash, mpd.as_bytes()).await
 }
 
-async fn mpd_drm(client: &Client, inputs: &[PathBuf], key: &str) -> Result<StreamId> {
-    let output = "/tmp/output".as_ref();
-    let mut outputs = Vec::with_capacity(inputs.len());
+async fn mpd_drm(
+    client: &Client,
+    video: &[PathBuf],
+    audio: Option<&Path>,
+    key: &str,
+) -> Result<StreamId> {
     let mut cmd = Command::new("packager");
-    for (i, input) in inputs.iter().enumerate() {
-        let output = format!("/tmp/output{}.webm", i);
+    let mut voutputs = Vec::with_capacity(video.len() + 1);
+    for (i, input) in video.iter().enumerate() {
+        let output = format!("/tmp/video{}.webm", i);
         cmd.arg(format!(
             "in={},stream=video,output={},drm_label=key",
             input.to_str().unwrap(),
             &output,
         ));
-        outputs.push(output.into());
+        voutputs.push(output.into());
     }
+    let mut aoutput = None;
+    if let Some(input) = audio {
+        let output = "/tmp/audio.webm";
+        cmd.arg(format!(
+            "in={},stream=audio,output={},drm_label=key",
+            input.to_str().unwrap(),
+            &output,
+        ));
+        aoutput = Some(output.as_ref());
+    }
+    let mpd = "/tmp/output.mpd".as_ref();
     cmd.arg("--enable_raw_key_encryption")
         .arg("--keys")
         .arg(format!(
@@ -81,40 +115,47 @@ async fn mpd_drm(client: &Client, inputs: &[PathBuf], key: &str) -> Result<Strea
             key
         ))
         .arg("--mpd_output")
-        .arg(output)
+        .arg(mpd)
         .arg("--clear_lead")
         .arg("0")
         .arg("--protection_systems")
         .arg("Widevine");
     anyhow::ensure!(cmd.status()?.success());
-    let inputs = create_inputs(client, &outputs).await?;
-    create_mpd(client, &inputs, output).await
+    let inputs = create_inputs(client, &voutputs, aoutput).await?;
+    rewrite_mpd(client, &inputs, mpd).await
 }
 
-async fn mpd(client: &Client, inputs: &[PathBuf]) -> Result<StreamId> {
-    let inputs = create_inputs(client, inputs).await?;
-    let output = "/tmp/output".as_ref();
+async fn mpd(client: &Client, video: &[PathBuf], audio: Option<&Path>) -> Result<StreamId> {
+    let inputs = create_inputs(client, video, audio).await?;
+    let output = "/tmp/output.mpd".as_ref();
     let mut cmd = Command::new("ffmpeg");
-    let mut streams = String::new();
-    for (i, (path, _)) in inputs.iter().enumerate() {
+    for (path, _) in &inputs {
         cmd.arg("-f").arg("webm_dash_manifest").arg("-i").arg(path);
-        if !streams.is_empty() {
-            streams.push(',');
-        }
-        streams.push_str(&i.to_string());
     }
+    cmd.arg("-c").arg("copy");
     for i in 0..inputs.len() {
         cmd.arg("-map").arg(&i.to_string());
     }
-    cmd.arg("-c")
-        .arg("copy")
-        .arg("-f")
+    let mut adaptation_sets = String::new();
+    if !video.is_empty() {
+        adaptation_sets.push_str("id=0,streams=0");
+        for i in 1..video.len() {
+            adaptation_sets.push(',');
+            adaptation_sets.push_str(&i.to_string())
+        }
+    }
+    if audio.is_some() {
+        adaptation_sets.push_str(" id=1,streams=");
+        adaptation_sets.push_str(&video.len().to_string());
+    }
+    cmd.arg("-f")
         .arg("webm_dash_manifest")
         .arg("-adaptation_sets")
-        .arg(format!("id=0,streams={}", streams))
+        .arg(adaptation_sets)
+        .arg("-y")
         .arg(output);
     anyhow::ensure!(cmd.status()?.success());
-    create_mpd(client, &inputs, output).await
+    rewrite_mpd(client, &inputs, output).await
 }
 
 async fn manifest(
