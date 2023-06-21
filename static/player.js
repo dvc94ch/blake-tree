@@ -28,12 +28,12 @@ async function initPlayer() {
   // Listen for error events.
   player.addEventListener('error', onErrorEvent);
 
-  player.configure({
+  /*player.configure({
     drm: {
       //servers: { 'com.widevine.alpha': licenseServer }
       clearKeys: { '00000000000000000000000000000000': 'aaaaaaaabbbbbbbbccccccccdddddddd' }
     }
-  });
+  });*/
 
   // Try to load a manifest.
   // This is an asynchronous process.
