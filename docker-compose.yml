@@ -1,7 +1,4 @@
 version: '3.9'
-volumes:
-  peershare:
-  meilisearch:
 services:
   peershare:
     image: 'peershare/peershare'
@@ -16,8 +13,6 @@ services:
       RUST_LOG: info
     ports:
     - '3000:3000'
-    volumes:
-    - "peershare:/data"
     depends_on:
     - meilisearch
   meilisearch:
@@ -29,5 +24,3 @@ services:
     - 7700
     ports:
     - '7700:7700'
-    volumes:
-    - "meilisearch:/meili_data"

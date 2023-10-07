@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use clap::Parser;
-use peershare_core::{Mime, Range, StreamId};
+use peershare_core::{Mime, MimeType, Range, StreamId};
 use peershare_http_client::Client;
 use std::path::PathBuf;
 use url::Url;
@@ -16,6 +16,8 @@ struct Opts {
 #[derive(Parser)]
 enum Command {
     List,
+    Url(StreamOpts),
+    Open(StreamOpts),
     Create(CreateOpts),
     Read(RangeOpts),
     Ranges(StreamOpts),
@@ -28,6 +30,8 @@ struct CreateOpts {
     file: File,
     #[clap(short)]
     quiet: bool,
+    metadata: Option<PathBuf>,
+    content: Option<PathBuf>,
 }
 
 #[derive(Clone)]
@@ -45,6 +49,15 @@ impl std::str::FromStr for File {
         } else {
             Self::Path(s.parse()?)
         })
+    }
+}
+
+impl std::fmt::Display for File {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::Url(url) => url.fmt(f),
+            Self::Path(path) => path.to_str().unwrap().fmt(f),
+        }
     }
 }
 
@@ -69,12 +82,38 @@ async fn main() -> Result<()> {
     let client = Client::new(&url)?;
     match opts.cmd {
         Command::List => {
-            print_streams(client.list().await?.into_iter());
+            let client = &client;
+            let streams = client
+                .list()
+                .await?
+                .into_iter()
+                .map(|s| async move { Ok((s, client.content(s).await?)) });
+            let streams = futures::future::join_all(streams)
+                .await
+                .into_iter()
+                .collect::<Result<Vec<_>>>()?;
+            print_streams(streams.into_iter());
         }
-        Command::Create(CreateOpts { file, quiet }) => {
-            let (mime, data) = match file {
+        Command::Url(StreamOpts { stream }) => {
+            let stream = client.content(stream).await?;
+            let url = client.url(stream);
+            println!("{}", url);
+        }
+        Command::Open(StreamOpts { stream }) => {
+            let stream = client.content(stream).await?;
+            let url = client.url(stream);
+            // TODO: pass mime type to open
+            open::that(url.to_string())?;
+        }
+        Command::Create(CreateOpts {
+            file,
+            quiet,
+            metadata,
+            content,
+        }) => {
+            let (mime, data) = match &file {
                 File::Path(path) => {
-                    let mime = Mime::from_path(&path).unwrap_or_default();
+                    let mime = Mime::from_path(path).unwrap_or_default();
                     let data = std::fs::read(path)?;
                     (mime, data)
                 }
@@ -90,10 +129,29 @@ async fn main() -> Result<()> {
                 }
             };
             let stream = client.create(mime, &data).await?;
-            if quiet {
-                println!("{}", stream);
+
+            let content = if let Some(content) = content {
+                std::fs::read_to_string(content)?
+            } else if mime.r#type() == MimeType::Text {
+                std::str::from_utf8(&data)?.to_string()
             } else {
-                print_streams(std::iter::once(stream));
+                Default::default()
+            };
+
+            let mut metadata: serde_json::Map<String, serde_json::Value> =
+                if let Some(metadata) = metadata {
+                    let metadata = std::fs::read_to_string(metadata)?;
+                    serde_json::from_str(&metadata)?
+                } else {
+                    Default::default()
+                };
+            metadata.insert("source".into(), format!("{file}").into());
+            let manifest = client.manifest(stream, metadata, content).await?;
+
+            if quiet {
+                println!("{}", manifest);
+            } else {
+                print_streams(std::iter::once((manifest, stream)));
             }
         }
         Command::Read(RangeOpts { stream }) => {
@@ -123,14 +181,17 @@ fn to_mime(mime: Option<surf::http::Mime>) -> Result<Mime> {
     }
 }
 
-fn print_streams(streams: impl Iterator<Item = StreamId>) {
-    println!("| {:<60} | {:<10} | {:<30} |", "stream", "length", "mime");
-    for stream in streams {
+fn print_streams(streams: impl Iterator<Item = (StreamId, StreamId)>) {
+    println!("| {:<60} | {:<10} | {:<30} |", "stream", "length", "mime",);
+    for (stream, content) in streams {
+        if stream.mime() != Mime::ApplicationPeershare {
+            continue;
+        }
         println!(
             "| {:<60} | {:>10} | {:<30} |",
-            stream,
+            format!("{stream}"),
             stream.length(),
-            format!("{}", stream.mime()),
+            format!("{}", content.mime()),
         );
     }
 }

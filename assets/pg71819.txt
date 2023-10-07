@@ -1,0 +1,764 @@
+﻿The Project Gutenberg eBook of The statistomat pitch
+    
+This ebook is for the use of anyone anywhere in the United States and
+most other parts of the world at no cost and with almost no restrictions
+whatsoever. You may copy it, give it away or re-use it under the terms
+of the Project Gutenberg License included with this ebook or online
+at www.gutenberg.org. If you are not located in the United States,
+you will have to check the laws of the country where you are located
+before using this eBook.
+
+Title: The statistomat pitch
+
+
+Author: Chan Davis
+
+Illustrator: John Schoenherr
+
+Release date: October 6, 2023 [eBook #71819]
+
+Language: English
+
+Original publication: New York, NY: Royal Publications, Inc, 1957
+
+Credits: Greg Weeks, Mary Meehan and the Online Distributed Proofreading Team at http://www.pgdp.net
+
+
+*** START OF THE PROJECT GUTENBERG EBOOK THE STATISTOMAT PITCH ***
+
+
+
+
+                         The Statistomat Pitch
+
+                             By CHAN DAVIS
+
+                    Illustrated by JOHN SCHOENHERR
+
+              _The product looked okay, and the salesman
+                   was sharp ... dangerously sharp!_
+
+           [Transcriber's Note: This etext was produced from
+                        Infinity January 1958.
+         Extensive research did not uncover any evidence that
+         the U.S. copyright on this publication was renewed.]
+
+
+The little salesman buzzed into my hotel room exactly at 10. He must
+have been waiting in the corridor, ambushing the second-hand.
+
+I watched from my deep chair in the corner while he slid open his
+raincoat, lifted it neatly off his back (the casual shrug wasn't his
+style), and stood with it hanging from his forefinger. With a bright,
+apologetic smile he hung it up in the alcove behind the door. I decided
+not to object to his using the hook without asking; it'd just slow
+things up.
+
+The salesman smiled again, ducked out into the corridor and back in
+with a flat 24x20 brief case and a large, oddly shaped suitcase. His
+presentation charts and a mockup of the computer, obviously. More
+apologetic faces, and he sat down.
+
+He said, "It was _very_ good of you, Mr. Borch, to give me this chance
+to tell you about our new, personalized Statistomat. I know you're a
+busy man--"
+
+I raised my drooping eyelids just enough to see him properly.
+
+"--with all your responsibilities, and I hope I'll be able to answer
+all your questions on modern estate planning. That's what I'm here
+for!" He smiled as if he were pausing for questions, but he didn't
+pause.
+
+He intoned, "The man of wealth has a special responsibility in our
+society. He is the trustee of invested capital, on which our economy
+rests. His proud charge is to direct and build his holdings wisely;
+and natural economic laws have justly placed the nation's considerable
+estates in the hands of men equal to the charge.
+
+"At the same time, such men owe themselves freedom from deprivation.
+And they owe themselves a financial plan adapted to their
+own--er--preferences and tastes in freedom from deprivation. This is
+why we speak of _personalized_ estate planning. Maybe this will be
+still clearer, Mr. Borch, if we look at an example."
+
+       *       *       *       *       *
+
+Here we go again, I thought, as he hauled a packet out of his brief
+case, opened it out into a little stand on the table, and flipped up
+the first chart.
+
+"Take the case of Robert Jones, who inherits $25,000,000 from
+his father. The inheritance taxes are all taken care of by
+investment-incentive deductions, so Mr. Jones has $25,000,000 in liquid
+assets to invest."
+
+Right on the ball, I thought. The hypothetical 25 million was just
+about twice the publicly known size of the Borch estate, therefore
+right in the league he could figure I'd like to be playing in. And the
+hypothetical Jones on the chart, confidently facing the future, was
+handsome and dignified, but not _much_ more so than I was.
+
+"Mr. Jones has a wife and one young son." They appeared beside him on
+the second chart, and they looked very pleasant. The salesman knew Jed
+Borch was unmarried. "He has planned to his satisfaction a way of life
+appropriate to his standing." On the next chart the Jones family was
+backed up by a half-acre bungalow, a lake, and wooded hills.
+
+"His desire is for security, to ensure this pattern of living to
+himself and his wife, and to his son. His personalized Statistomat
+plans his finances accordingly." On succeeding charts, Jones changed
+only in subtle lengthening of the firm lines in his face, his wife
+didn't change at all, but his son sprouted to a six-footer and the
+bungalow grew some too. A bar graph superimposed on the picture kept
+track of the investment. By the time the boy was full-grown it had
+risen to a modest $100,000,000.
+
+"On the other hand, consider Michael Thompson. Starting with the same
+sum of $25,000,000, he may just as legitimately view different goals.
+Mr. Thompson is unmarried, and has not yet chosen to what station he
+will aspire." Chapter Two of the charts had just as admirable-looking
+a man (different color hair). I was curious how much Statistomat would
+finagle for him, but not curious enough to sit through another dozen
+charts. When the salesman said, "Naturally he's willing to risk--" I
+interrupted:
+
+"I don't want any risk. Can't afford to." I smiled slyly.
+"Responsibility to society."
+
+"Of course, of course, but you might be willing, like Mr. Thompson,
+to--er--look beyond the more accepted channels of finance for the sake
+of the larger returns that can be realized by breaking new ground, as
+it were--participating in pioneering enterprises."
+
+"Oh, sure. Don't want to miss any bets."
+
+       *       *       *       *       *
+
+So far you couldn't see anything to complain about in his pitch,
+considering it alongside the pitch for General Computers' Incomac. In
+fact it essentially _was_ a General Computers pitch, with the brand
+name changed. Let's get to the point, I thought. I pointed to the odd
+suitcase. "Uh ... what's that?"
+
+He was adaptable enough to give up the Michael Thompson story and open
+up the suitcase, promptly and proudly.
+
+"Oh, the computer," I said, almost encouragingly.
+
+But he didn't let that stand. "No," he admitted, "this is just a
+life-size facsimile of the new Statistomat. I'm afraid the real thing
+is too valuable and too heavy for me to carry around, even to such an
+important interview as this."
+
+"How heavy?"
+
+"I'd say about ten times as heavy as this one," he evaded neatly. "Now
+on this facsimile I can illustrate the ideas we've been developing.
+Here, you see this screen and these knobs. I'll turn this switch on and
+we can watch this part of it just as if this was the real computer."
+
+My surprise was genuine. His demonstration mockup was a live one. I
+wished my brother could see it.
+
+"On this screen we record your time-dependent utility function. For
+your convenience, the input is mechanical, but from this point on all
+the Statistomat's computing is performed digitally."
+
+I said, "Huh?"
+
+"Time-dependent utility function," he repeated brightly.
+
+"Oh, I can't be bothered--all that technical stuff--leave it to
+specialists," I muttered, making the trap nice and inviting.
+
+But he knew he had to explain. "Naturally only the essentials need
+_your_ personal attention," he said smoothly. "You express in the
+time-dependent utility function your financial policy--the broad,
+overall outlines of the course you want to steer. This must come from
+you. This makes the difference between a Robert Jones and a Michael
+Thompson. You have a possibility of doubling your investment in a year,
+let's say. How certain do you have to be of it before you prefer it to
+a more conservative investment? Even odds? Six to four? Or we might ask
+a similar question about a ten-year period. You see the point."
+
+"Uh ... but it depends on how much I've got." I kicked myself. My
+brother would not approve my helping the salesman along like that.
+
+"Ah, yes! Certainly! When you have a hundred million, an extra million
+won't seem nearly as important to you as when you have twenty-five.
+We understand! Our technical expression for this is that the value of
+money to the investor is not a linear function of dollars. Logarithmic,
+some say--but that depends on the investor. Whatever relationship you
+select as a matter of fiscal policy. That is a part, a critical part,
+of the information which you give the Statistomat when you work out
+your time-dependent utility function, or risk function, as we call it
+for short."
+
+"No risk! Can't afford risk!"
+
+"Mr. Borch, I speak with confidence when I assure you that your estate
+can be subject to as little risk when its direction is assigned to the
+Statistomat as in any other way." I almost called him on that, until
+I reflected that he had really made only one specific claim: that you
+could feed just as excessively conservative a risk function into the
+Statistomat, if you were compulsively conservative, as you could into
+the G.C. Incomac. That might be true.
+
+He went on, "Two of the soundest business research agencies in the
+country have been invited to inspect all our operations and have okayed
+us, not once but repeatedly: the S.E.C. and the F.T.C."
+
+Darn right they've checked you, I thought--by law. And don't think
+they'll stop.
+
+       *       *       *       *       *
+
+But it didn't do any good to spot a steep slant in his formulations.
+He was a salesman, after all. Just so he stayed clear of demonstrable
+falsehoods and "fraudulent tendencies" (as defined by the 1978 Commerce
+Act), he was within his rights.
+
+He was staying clear. Some of his claims a stickler might want to check
+up on; but I wasn't going to bother any more to watch for things like
+that. I thought the stickler would find in each case that he'd been
+wasting his time. This little salesman seemed awfully good at skating
+just at the edge. He really knew his profession.
+
+I didn't let my bafflement show. I just looked at him dully and made
+noises as if I was about to say something. I was, but I didn't know
+what.
+
+There just had to be something bad about this Statistomat venture.
+Without (apparently) any new gimmick, a small new company was producing
+just as good a product as one of General Computers' best-managed
+divisions. How could Statistomat hope to deliver a normal profit? It
+wasn't reasonable. There must be badly cut corners, if not in the
+product then in the sales program or the servicing of customers; or
+else the investors _weren't_ hoping for a normal return. In that case
+there was something funny in their motives--a long-range scheme to
+undermine G.C., or something. That might show up in this salesman's
+pitch.
+
+So I switched to, "How do I know what stocks this thing'll tell me to
+buy?"
+
+"Not _tell_ you to buy," he corrected charmingly, "_buy_ you. The
+machine can be connected by direct wire to the Exchange's computer."
+
+"Yeah-yeah, but how do I know what stocks I'll be getting? I want
+General Computers preferred!"
+
+He smiled. "Quite possibly you'll find yourself the owner of a
+considerable block of G.C. preferred--provided of course your
+time-dependent utility function dictates a policy which--"
+
+"You mean," I said, with the very suspicious expression my brother
+always objected to, "you'd let your machine bid for G.C. stock for me?"
+
+"Naturally. The Statistomat has often recommended purchase of G.C.
+stock. Let me explain to you an aspect of modern firm management which
+may be so specialized as to have escaped your attention.
+
+"Each firm draws up what is called a preference function. It is
+somewhat analogous to the investor's time-dependent utility function.
+It gives exact expression to the objectives of the firm. For any
+conceivable economic position the firm might be in, it determines,
+let us say, the weight the board places on a dividend this year as
+against a larger dividend a year from now, or ten. And so on. It is
+the criterion for all the optimization computations which pattern the
+firm's activities.
+
+"Under a 1978 law, every corporation offering stock on the Exchange
+must publish its preference function. All these preference functions
+are known to your Statistomat; in effect, it is as if they were all in
+Statistomat's memory, continuously updated, automatically. Naturally,
+for a particular kind of investor only certain kinds of stock are
+suitable.
+
+"But Statistomat does more--and this is the point I think you'll find
+intensely interesting. After all, more than the firm's policy is
+important. Two firms may have identical financial policies but very
+different dividend rates, either due to different degrees of success or
+to different kinds of partial success. Statistomat also has available
+to it a sound estimate of the firm's expectations--"
+
+"Who does the--uh--estimating?"
+
+"Based entirely on Commerce Department reports. That's as impartial as
+you can get, Mr. Borch, and it's also one of the best-informed sources
+in the country. This information is processed at our home office on one
+of the largest automatic computers in the world. You see, Statistomat
+Incorporated is deeply conscious of its responsibility to give flawless
+service to the men who control and direct America's fortunes."
+
+       *       *       *       *       *
+
+The little salesman sounded overconfident again so I thought I'd shake
+him up. "What does General Computers use for their whatchamacallit?"
+
+"The General Computers' Incomac uses exactly the same sources of
+information."
+
+I said in a bored voice, "What do you do different?"
+
+"The principles of investment planning are scientific principles, Mr.
+Borch, and anybody working in this field must follow them."
+
+Let's hear you desperate, I thought, but my voice just got drier.
+"Guess I might as well get an--"
+
+"Of course there are differences!"
+
+"Uh--yeah?"
+
+"Oh, yes, yes! You see, even though the principles are the same, still
+if only one company was offering this service to investors--"
+
+"Then what? It'd jack up the prices?"
+
+But that was over-eager. He backed away immediately: "Certainly
+not, Mr. Borch. Who could suggest such a thing? We all know General
+Computers' spotless reputation as one of the most heavily capitalized
+corporations in the country. Besides, by now we should be free of
+wild brain-truster theories about the evils of monopoly." He smiled
+sanctimoniously.
+
+I drawled, "So what if only one company was selling these machines?" My
+brother would be grinding his teeth at this follow-up. But I thought I
+just about had this salesman boxed. I'd better! He was catching on.
+
+He answered, "Even though the same principles are applied, there are
+bound to be individual differences in their application. If all users
+of estate planning computers had relations with the same firm, all
+these minor fluctuations would be in the same direction for all of
+them. Although the investment mixes would be far from identical, they
+would be more alike than economic principles require. On the other
+hand, the investor who has the courage to associate himself with an
+alternate set of analyses may be comparatively alone in the course he
+chooses. Thus he may benefit, when this course chances to be better
+than expectations, by having to share the reward with relatively few
+others."
+
+I had him! I said, "You mean this thing might buy me different stocks
+from what the G.C. whatchamacallit would?"
+
+"Why, yes, it would be surprising if there was not at some point a
+difference in the two solutions. That was the point you raised so
+well--"
+
+"And you mean your answer might make me more money?"
+
+"Why, yes, in the case--that is, in the way that I was discussing.
+Mmm-hmm."
+
+"But then you think G.C. gives out wrong solutions."
+
+"Not _wrong_--"
+
+"Solutions that aren't the best--that _means_ wrong, huh?"
+
+"Why, yes, I mean, I suppose that--" He stopped.
+
+       *       *       *       *       *
+
+I smiled. I dropped my Jed Borch personality (which the little salesman
+probably much preferred). "You know who you've been talking to?"
+
+"F.T.C.?"
+
+"An F.T.C. Investigator," I said, professionally. Without waiting for
+him to ask, I showed him my card, with the impressive embossed words
+across the center: "Fair Trade Corps." Then I pressed a button and
+instantly two cops were in the door and at the salesman's shoulders.
+
+The salesman said, "What's the charge?"
+
+"You know what it is."
+
+"The charge, please."
+
+I shrugged. "Fraudulent tendencies; to wit, unfair, untrue, and
+scurrilous maligning of a competitive corporate body, individual,
+and/or product. Okay, boys."
+
+They handcuffed him and hustled him out without even picking up his
+luggage and his raincoat. He tried to look confident, but I thought
+the law-abiding public wouldn't suffer much longer from the connivings
+of Statistomat, Inc. I settled back into the deep chair and turned with
+a triumphant grin toward the door of the room's closet.
+
+It opened. My brother, dressed in the distinctive charcoal-green suit
+of a General Computers junior executive, stepped out, turning off the
+tape recorder as he came.
+
+He was grinning too. "You had me biting my lip," he admitted, "but you
+came through all right. It's a good thing, too. It always gives me a
+specially grateful feeling when I see society saved from a deviant
+like that.... It's not that there was any danger they would have
+challenged Incomac's market leadership, but even if they had continued
+in existence as small as they are now they would have taken away _some_
+customers. Our responsibility to our stockholders is not just to make
+profit. It is to make the maximum possible profit--to optimize!"
+
+Of course!
+
+My brother's gaze was distant as his keen mind searched for the deeper
+lessons of the day's work. He said, "Maybe we should get the public
+release of those Commerce Department reports discontinued."
+
+
+
+
+        
+            *** END OF THE PROJECT GUTENBERG EBOOK THE STATISTOMAT PITCH ***
+        
+
+    
+
+Updated editions will replace the previous one—the old editions will
+be renamed.
+
+Creating the works from print editions not protected by U.S. copyright
+law means that no one owns a United States copyright in these works,
+so the Foundation (and you!) can copy and distribute it in the United
+States without permission and without paying copyright
+royalties. Special rules, set forth in the General Terms of Use part
+of this license, apply to copying and distributing Project
+Gutenberg™ electronic works to protect the PROJECT GUTENBERG™
+concept and trademark. Project Gutenberg is a registered trademark,
+and may not be used if you charge for an eBook, except by following
+the terms of the trademark license, including paying royalties for use
+of the Project Gutenberg trademark. If you do not charge anything for
+copies of this eBook, complying with the trademark license is very
+easy. You may use this eBook for nearly any purpose such as creation
+of derivative works, reports, performances and research. Project
+Gutenberg eBooks may be modified and printed and given away—you may
+do practically ANYTHING in the United States with eBooks not protected
+by U.S. copyright law. Redistribution is subject to the trademark
+license, especially commercial redistribution.
+
+
+START: FULL LICENSE
+
+THE FULL PROJECT GUTENBERG LICENSE
+
+PLEASE READ THIS BEFORE YOU DISTRIBUTE OR USE THIS WORK
+
+To protect the Project Gutenberg™ mission of promoting the free
+distribution of electronic works, by using or distributing this work
+(or any other work associated in any way with the phrase “Project
+Gutenberg”), you agree to comply with all the terms of the Full
+Project Gutenberg™ License available with this file or online at
+www.gutenberg.org/license.
+
+Section 1. General Terms of Use and Redistributing Project Gutenberg™
+electronic works
+
+1.A. By reading or using any part of this Project Gutenberg™
+electronic work, you indicate that you have read, understand, agree to
+and accept all the terms of this license and intellectual property
+(trademark/copyright) agreement. If you do not agree to abide by all
+the terms of this agreement, you must cease using and return or
+destroy all copies of Project Gutenberg™ electronic works in your
+possession. If you paid a fee for obtaining a copy of or access to a
+Project Gutenberg™ electronic work and you do not agree to be bound
+by the terms of this agreement, you may obtain a refund from the person
+or entity to whom you paid the fee as set forth in paragraph 1.E.8.
+
+1.B. “Project Gutenberg” is a registered trademark. It may only be
+used on or associated in any way with an electronic work by people who
+agree to be bound by the terms of this agreement. There are a few
+things that you can do with most Project Gutenberg™ electronic works
+even without complying with the full terms of this agreement. See
+paragraph 1.C below. There are a lot of things you can do with Project
+Gutenberg™ electronic works if you follow the terms of this
+agreement and help preserve free future access to Project Gutenberg™
+electronic works. See paragraph 1.E below.
+
+1.C. The Project Gutenberg Literary Archive Foundation (“the
+Foundation” or PGLAF), owns a compilation copyright in the collection
+of Project Gutenberg™ electronic works. Nearly all the individual
+works in the collection are in the public domain in the United
+States. If an individual work is unprotected by copyright law in the
+United States and you are located in the United States, we do not
+claim a right to prevent you from copying, distributing, performing,
+displaying or creating derivative works based on the work as long as
+all references to Project Gutenberg are removed. Of course, we hope
+that you will support the Project Gutenberg™ mission of promoting
+free access to electronic works by freely sharing Project Gutenberg™
+works in compliance with the terms of this agreement for keeping the
+Project Gutenberg™ name associated with the work. You can easily
+comply with the terms of this agreement by keeping this work in the
+same format with its attached full Project Gutenberg™ License when
+you share it without charge with others.
+
+1.D. The copyright laws of the place where you are located also govern
+what you can do with this work. Copyright laws in most countries are
+in a constant state of change. If you are outside the United States,
+check the laws of your country in addition to the terms of this
+agreement before downloading, copying, displaying, performing,
+distributing or creating derivative works based on this work or any
+other Project Gutenberg™ work. The Foundation makes no
+representations concerning the copyright status of any work in any
+country other than the United States.
+
+1.E. Unless you have removed all references to Project Gutenberg:
+
+1.E.1. The following sentence, with active links to, or other
+immediate access to, the full Project Gutenberg™ License must appear
+prominently whenever any copy of a Project Gutenberg™ work (any work
+on which the phrase “Project Gutenberg” appears, or with which the
+phrase “Project Gutenberg” is associated) is accessed, displayed,
+performed, viewed, copied or distributed:
+
+    This eBook is for the use of anyone anywhere in the United States and most
+    other parts of the world at no cost and with almost no restrictions
+    whatsoever. You may copy it, give it away or re-use it under the terms
+    of the Project Gutenberg License included with this eBook or online
+    at www.gutenberg.org. If you
+    are not located in the United States, you will have to check the laws
+    of the country where you are located before using this eBook.
+  
+1.E.2. If an individual Project Gutenberg™ electronic work is
+derived from texts not protected by U.S. copyright law (does not
+contain a notice indicating that it is posted with permission of the
+copyright holder), the work can be copied and distributed to anyone in
+the United States without paying any fees or charges. If you are
+redistributing or providing access to a work with the phrase “Project
+Gutenberg” associated with or appearing on the work, you must comply
+either with the requirements of paragraphs 1.E.1 through 1.E.7 or
+obtain permission for the use of the work and the Project Gutenberg™
+trademark as set forth in paragraphs 1.E.8 or 1.E.9.
+
+1.E.3. If an individual Project Gutenberg™ electronic work is posted
+with the permission of the copyright holder, your use and distribution
+must comply with both paragraphs 1.E.1 through 1.E.7 and any
+additional terms imposed by the copyright holder. Additional terms
+will be linked to the Project Gutenberg™ License for all works
+posted with the permission of the copyright holder found at the
+beginning of this work.
+
+1.E.4. Do not unlink or detach or remove the full Project Gutenberg™
+License terms from this work, or any files containing a part of this
+work or any other work associated with Project Gutenberg™.
+
+1.E.5. Do not copy, display, perform, distribute or redistribute this
+electronic work, or any part of this electronic work, without
+prominently displaying the sentence set forth in paragraph 1.E.1 with
+active links or immediate access to the full terms of the Project
+Gutenberg™ License.
+
+1.E.6. You may convert to and distribute this work in any binary,
+compressed, marked up, nonproprietary or proprietary form, including
+any word processing or hypertext form. However, if you provide access
+to or distribute copies of a Project Gutenberg™ work in a format
+other than “Plain Vanilla ASCII” or other format used in the official
+version posted on the official Project Gutenberg™ website
+(www.gutenberg.org), you must, at no additional cost, fee or expense
+to the user, provide a copy, a means of exporting a copy, or a means
+of obtaining a copy upon request, of the work in its original “Plain
+Vanilla ASCII” or other form. Any alternate format must include the
+full Project Gutenberg™ License as specified in paragraph 1.E.1.
+
+1.E.7. Do not charge a fee for access to, viewing, displaying,
+performing, copying or distributing any Project Gutenberg™ works
+unless you comply with paragraph 1.E.8 or 1.E.9.
+
+1.E.8. You may charge a reasonable fee for copies of or providing
+access to or distributing Project Gutenberg™ electronic works
+provided that:
+
+    • You pay a royalty fee of 20% of the gross profits you derive from
+        the use of Project Gutenberg™ works calculated using the method
+        you already use to calculate your applicable taxes. The fee is owed
+        to the owner of the Project Gutenberg™ trademark, but he has
+        agreed to donate royalties under this paragraph to the Project
+        Gutenberg Literary Archive Foundation. Royalty payments must be paid
+        within 60 days following each date on which you prepare (or are
+        legally required to prepare) your periodic tax returns. Royalty
+        payments should be clearly marked as such and sent to the Project
+        Gutenberg Literary Archive Foundation at the address specified in
+        Section 4, “Information about donations to the Project Gutenberg
+        Literary Archive Foundation.”
+    
+    • You provide a full refund of any money paid by a user who notifies
+        you in writing (or by e-mail) within 30 days of receipt that s/he
+        does not agree to the terms of the full Project Gutenberg™
+        License. You must require such a user to return or destroy all
+        copies of the works possessed in a physical medium and discontinue
+        all use of and all access to other copies of Project Gutenberg™
+        works.
+    
+    • You provide, in accordance with paragraph 1.F.3, a full refund of
+        any money paid for a work or a replacement copy, if a defect in the
+        electronic work is discovered and reported to you within 90 days of
+        receipt of the work.
+    
+    • You comply with all other terms of this agreement for free
+        distribution of Project Gutenberg™ works.
+    
+
+1.E.9. If you wish to charge a fee or distribute a Project
+Gutenberg™ electronic work or group of works on different terms than
+are set forth in this agreement, you must obtain permission in writing
+from the Project Gutenberg Literary Archive Foundation, the manager of
+the Project Gutenberg™ trademark. Contact the Foundation as set
+forth in Section 3 below.
+
+1.F.
+
+1.F.1. Project Gutenberg volunteers and employees expend considerable
+effort to identify, do copyright research on, transcribe and proofread
+works not protected by U.S. copyright law in creating the Project
+Gutenberg™ collection. Despite these efforts, Project Gutenberg™
+electronic works, and the medium on which they may be stored, may
+contain “Defects,” such as, but not limited to, incomplete, inaccurate
+or corrupt data, transcription errors, a copyright or other
+intellectual property infringement, a defective or damaged disk or
+other medium, a computer virus, or computer codes that damage or
+cannot be read by your equipment.
+
+1.F.2. LIMITED WARRANTY, DISCLAIMER OF DAMAGES - Except for the “Right
+of Replacement or Refund” described in paragraph 1.F.3, the Project
+Gutenberg Literary Archive Foundation, the owner of the Project
+Gutenberg™ trademark, and any other party distributing a Project
+Gutenberg™ electronic work under this agreement, disclaim all
+liability to you for damages, costs and expenses, including legal
+fees. YOU AGREE THAT YOU HAVE NO REMEDIES FOR NEGLIGENCE, STRICT
+LIABILITY, BREACH OF WARRANTY OR BREACH OF CONTRACT EXCEPT THOSE
+PROVIDED IN PARAGRAPH 1.F.3. YOU AGREE THAT THE FOUNDATION, THE
+TRADEMARK OWNER, AND ANY DISTRIBUTOR UNDER THIS AGREEMENT WILL NOT BE
+LIABLE TO YOU FOR ACTUAL, DIRECT, INDIRECT, CONSEQUENTIAL, PUNITIVE OR
+INCIDENTAL DAMAGES EVEN IF YOU GIVE NOTICE OF THE POSSIBILITY OF SUCH
+DAMAGE.
+
+1.F.3. LIMITED RIGHT OF REPLACEMENT OR REFUND - If you discover a
+defect in this electronic work within 90 days of receiving it, you can
+receive a refund of the money (if any) you paid for it by sending a
+written explanation to the person you received the work from. If you
+received the work on a physical medium, you must return the medium
+with your written explanation. The person or entity that provided you
+with the defective work may elect to provide a replacement copy in
+lieu of a refund. If you received the work electronically, the person
+or entity providing it to you may choose to give you a second
+opportunity to receive the work electronically in lieu of a refund. If
+the second copy is also defective, you may demand a refund in writing
+without further opportunities to fix the problem.
+
+1.F.4. Except for the limited right of replacement or refund set forth
+in paragraph 1.F.3, this work is provided to you ‘AS-IS’, WITH NO
+OTHER WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
+LIMITED TO WARRANTIES OF MERCHANTABILITY OR FITNESS FOR ANY PURPOSE.
+
+1.F.5. Some states do not allow disclaimers of certain implied
+warranties or the exclusion or limitation of certain types of
+damages. If any disclaimer or limitation set forth in this agreement
+violates the law of the state applicable to this agreement, the
+agreement shall be interpreted to make the maximum disclaimer or
+limitation permitted by the applicable state law. The invalidity or
+unenforceability of any provision of this agreement shall not void the
+remaining provisions.
+
+1.F.6. INDEMNITY - You agree to indemnify and hold the Foundation, the
+trademark owner, any agent or employee of the Foundation, anyone
+providing copies of Project Gutenberg™ electronic works in
+accordance with this agreement, and any volunteers associated with the
+production, promotion and distribution of Project Gutenberg™
+electronic works, harmless from all liability, costs and expenses,
+including legal fees, that arise directly or indirectly from any of
+the following which you do or cause to occur: (a) distribution of this
+or any Project Gutenberg™ work, (b) alteration, modification, or
+additions or deletions to any Project Gutenberg™ work, and (c) any
+Defect you cause.
+
+Section 2. Information about the Mission of Project Gutenberg™
+
+Project Gutenberg™ is synonymous with the free distribution of
+electronic works in formats readable by the widest variety of
+computers including obsolete, old, middle-aged and new computers. It
+exists because of the efforts of hundreds of volunteers and donations
+from people in all walks of life.
+
+Volunteers and financial support to provide volunteers with the
+assistance they need are critical to reaching Project Gutenberg™’s
+goals and ensuring that the Project Gutenberg™ collection will
+remain freely available for generations to come. In 2001, the Project
+Gutenberg Literary Archive Foundation was created to provide a secure
+and permanent future for Project Gutenberg™ and future
+generations. To learn more about the Project Gutenberg Literary
+Archive Foundation and how your efforts and donations can help, see
+Sections 3 and 4 and the Foundation information page at www.gutenberg.org.
+
+Section 3. Information about the Project Gutenberg Literary Archive Foundation
+
+The Project Gutenberg Literary Archive Foundation is a non-profit
+501(c)(3) educational corporation organized under the laws of the
+state of Mississippi and granted tax exempt status by the Internal
+Revenue Service. The Foundation’s EIN or federal tax identification
+number is 64-6221541. Contributions to the Project Gutenberg Literary
+Archive Foundation are tax deductible to the full extent permitted by
+U.S. federal laws and your state’s laws.
+
+The Foundation’s business office is located at 809 North 1500 West,
+Salt Lake City, UT 84116, (801) 596-1887. Email contact links and up
+to date contact information can be found at the Foundation’s website
+and official page at www.gutenberg.org/contact
+
+Section 4. Information about Donations to the Project Gutenberg
+Literary Archive Foundation
+
+Project Gutenberg™ depends upon and cannot survive without widespread
+public support and donations to carry out its mission of
+increasing the number of public domain and licensed works that can be
+freely distributed in machine-readable form accessible by the widest
+array of equipment including outdated equipment. Many small donations
+($1 to $5,000) are particularly important to maintaining tax exempt
+status with the IRS.
+
+The Foundation is committed to complying with the laws regulating
+charities and charitable donations in all 50 states of the United
+States. Compliance requirements are not uniform and it takes a
+considerable effort, much paperwork and many fees to meet and keep up
+with these requirements. We do not solicit donations in locations
+where we have not received written confirmation of compliance. To SEND
+DONATIONS or determine the status of compliance for any particular state
+visit www.gutenberg.org/donate.
+
+While we cannot and do not solicit contributions from states where we
+have not met the solicitation requirements, we know of no prohibition
+against accepting unsolicited donations from donors in such states who
+approach us with offers to donate.
+
+International donations are gratefully accepted, but we cannot make
+any statements concerning tax treatment of donations received from
+outside the United States. U.S. laws alone swamp our small staff.
+
+Please check the Project Gutenberg web pages for current donation
+methods and addresses. Donations are accepted in a number of other
+ways including checks, online payments and credit card donations. To
+donate, please visit: www.gutenberg.org/donate.
+
+Section 5. General Information About Project Gutenberg™ electronic works
+
+Professor Michael S. Hart was the originator of the Project
+Gutenberg™ concept of a library of electronic works that could be
+freely shared with anyone. For forty years, he produced and
+distributed Project Gutenberg™ eBooks with only a loose network of
+volunteer support.
+
+Project Gutenberg™ eBooks are often created from several printed
+editions, all of which are confirmed as not protected by copyright in
+the U.S. unless a copyright notice is included. Thus, we do not
+necessarily keep eBooks in compliance with any particular paper
+edition.
+
+Most people start at our website which has the main PG search
+facility: www.gutenberg.org.
+
+This website includes information about Project Gutenberg™,
+including how to make donations to the Project Gutenberg Literary
+Archive Foundation, how to help produce our new eBooks, and how to
+subscribe to our email newsletter to hear about new eBooks.
+
+

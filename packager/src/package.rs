@@ -166,31 +166,3 @@ fn mpd(video: Vec<PathBuf>, audio: Vec<PathBuf>) -> Result<Package> {
         mpd: mpd.into(),
     })
 }
-
-async fn manifest(
-    client: &Client,
-    stream_id: StreamId,
-    metadata: Option<&Path>,
-    content: Option<&Path>,
-) -> Result<StreamId> {
-    let metadata = if let Some(path) = metadata {
-        let metadata = std::fs::read_to_string(path)?;
-        serde_json::from_str(&metadata)?
-    } else {
-        Default::default()
-    };
-    let content = if let Some(path) = content {
-        std::fs::read_to_string(path)?
-    } else {
-        Default::default()
-    };
-    let manifest = Manifest {
-        stream_id,
-        metadata,
-        content,
-    };
-    let manifest = serde_json::to_string(&manifest)?;
-    client
-        .create(Mime::ApplicationPeershare, manifest.as_bytes())
-        .await
-}

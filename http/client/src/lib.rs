@@ -1,5 +1,5 @@
 use anyhow::Result;
-use peershare_core::{Mime, Range, StreamId};
+use peershare_core::{Manifest, Mime, Range, StreamId};
 use surf::Url;
 
 pub struct Client {
@@ -24,6 +24,38 @@ impl Client {
         streams.into_iter().map(|s| s.parse()).collect()
     }
 
+    pub fn url(&self, id: StreamId) -> Url {
+        let mut url = self.url.clone();
+        url.set_path(&format!("/streams/{id}"));
+        url
+    }
+
+    pub async fn content(&self, id: StreamId) -> Result<StreamId> {
+        Ok(if id.mime() == Mime::ApplicationPeershare {
+            let bytes = self.read(id, None).await?;
+            let manifest: Manifest = serde_json::from_slice(&bytes)?;
+            manifest.stream_id
+        } else {
+            id
+        })
+    }
+
+    pub async fn manifest(
+        &self,
+        stream_id: StreamId,
+        metadata: serde_json::Map<String, serde_json::Value>,
+        content: String,
+    ) -> Result<StreamId> {
+        let manifest = Manifest {
+            stream_id,
+            metadata,
+            content,
+        };
+        let manifest = serde_json::to_string(&manifest)?;
+        self.create(Mime::ApplicationPeershare, manifest.as_bytes())
+            .await
+    }
+
     pub async fn create(&self, mime: Mime, data: &[u8]) -> Result<StreamId> {
         let stream_id: String = surf::post(format!("{}streams", &self.url))
             .body_bytes(data)
@@ -38,7 +70,7 @@ impl Client {
     }
 
     pub async fn read(&self, id: StreamId, range: Option<Range>) -> Result<Vec<u8>> {
-        let mut builder = surf::get(format!("{}streams/{}", &self.url, id));
+        let mut builder = surf::get(self.url(id));
         if let Some(range) = range {
             builder = builder.header(
                 "Range",
