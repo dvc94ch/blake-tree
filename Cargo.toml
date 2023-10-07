@@ -5,7 +5,6 @@ members = [
     "fuse",
     "http",
     "http/client",
-    "packager",
 ]
 resolver = "2"
 
