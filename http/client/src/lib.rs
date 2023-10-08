@@ -26,7 +26,7 @@ impl Client {
 
     pub fn url(&self, id: StreamId) -> Url {
         let mut url = self.url.clone();
-        url.set_path(&format!("/streams/{id}"));
+        url.set_path(&format!("/streams/{:#}", id));
         url
     }
 

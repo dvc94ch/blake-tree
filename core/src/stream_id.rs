@@ -108,7 +108,11 @@ impl std::fmt::Debug for StreamId {
 impl std::fmt::Display for StreamId {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let base64 = self.to_base64();
-        write!(f, "{}", std::str::from_utf8(&base64).unwrap())
+        write!(f, "{}", std::str::from_utf8(&base64).unwrap())?;
+        if f.alternate() {
+            write!(f, ".{}", self.mime().extension())?;
+        }
+        Ok(())
     }
 }
 
@@ -116,7 +120,12 @@ impl std::str::FromStr for StreamId {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::from_base64(s.as_bytes())
+        let mut s = s.split('.');
+        let stream = Self::from_base64(s.next().unwrap().as_bytes())?;
+        if let Some(ext) = s.next() {
+            anyhow::ensure!(stream.mime().extension() == ext);
+        }
+        Ok(stream)
     }
 }
 
@@ -149,6 +158,15 @@ mod tests {
         let id = StreamId::new(blake3::hash(b""), 42, Mime::ApplicationTar as _);
         let s = id.to_string();
         println!("{}", s);
+        let id2: StreamId = s.parse().unwrap();
+        assert_eq!(id2, id);
+    }
+
+    #[test]
+    fn test_from_str_fmt_alternate() {
+        let id = StreamId::new(blake3::hash(b""), 42, Mime::ApplicationTar as _);
+        let s = format!("{:#}", id);
+        println!("{s}");
         let id2: StreamId = s.parse().unwrap();
         assert_eq!(id2, id);
     }
