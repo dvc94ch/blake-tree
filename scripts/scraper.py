@@ -6,26 +6,28 @@ import os
 import sys
 import onnx
 import torch
-import onnxruntime
+#import onnxruntime
 from omegaconf import OmegaConf
 
 input = sys.argv[1]
+output = sys.argv[2]
 
-name, ext = os.path.splitext(input)
+ext = os.path.splitext(input)[1]
+name = os.path.splitext(output)[0]
 
-if ext == "pdf":
+if ext == ".pdf":
     with pdfplumber.open(input) as pdf:
-        with open(output) as f:
+        with open(output, "w+") as f:
             for page in pdf.pages:
                 text = page.extract_text_simple(x_tolerance=3, y_tolerance=3)
                 f.write(text)
-elif ext == "png" or ext == "jpg":
+elif ext == ".png" or ext == ".jpg":
     image = Image.open(input)
     text = pytesseract.image_to_string(image)
-    with open(output) as f:
+    with open(output, "w+") as f:
         f.write(text)
-elif ext == "webm" or ext == "weba":
-    os.exec("ffmpeg -i %s -vn -acodec copy %s.ogg" % (input, name))
+elif ext == ".webm" or ext == ".weba":
+    os.system("ffmpeg -i %s -vn -acodec copy %s.ogg" % (input, name))
     language = 'en' # also available 'de', 'es'
 
     # load provided utils
@@ -56,5 +58,7 @@ elif ext == "webm" or ext == "weba":
     ort_outs = ort_session.run(None, ort_inputs)
     decoded = decoder(torch.Tensor(ort_outs[0])[0])
 
-    with open(output) as f:
+    with open(output, "w+") as f:
         f.write(decoded)
+else:
+    print("unknown file extension %s" % ext)

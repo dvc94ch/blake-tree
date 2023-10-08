@@ -62,7 +62,7 @@ impl std::fmt::Display for File {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Self::Url(url) => url.fmt(f),
-            Self::Path(path) => path.to_str().unwrap().fmt(f),
+            Self::Path(path) => path.file_name().unwrap().to_str().unwrap().fmt(f),
         }
     }
 }
