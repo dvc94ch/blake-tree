@@ -5,19 +5,23 @@ use peershare_http_client::Client;
 use std::path::PathBuf;
 use url::Url;
 
+mod meili;
+
 #[derive(Parser)]
 struct Opts {
     #[clap(subcommand)]
     cmd: Command,
     #[clap(long)]
     url: Option<String>,
+    #[clap(long)]
+    meili_url: Option<String>,
 }
 
 #[derive(Parser)]
 enum Command {
-    List,
-    Url(StreamOpts),
-    Open(StreamOpts),
+    Search,
+    Open(MaybeStreamOpts),
+    Info(StreamOpts),
     Create(CreateOpts),
     Read(RangeOpts),
     Ranges(StreamOpts),
@@ -72,6 +76,11 @@ struct StreamOpts {
     stream: StreamId,
 }
 
+#[derive(Parser)]
+struct MaybeStreamOpts {
+    stream: Option<StreamId>,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::init();
@@ -79,31 +88,34 @@ async fn main() -> Result<()> {
     let url = opts
         .url
         .unwrap_or_else(|| "http://127.0.0.1:3000".to_string());
+    let meili_url = opts
+        .meili_url
+        .unwrap_or_else(|| "http://127.0.0.1:7700".to_string());
     let client = Client::new(&url)?;
     match opts.cmd {
-        Command::List => {
-            let client = &client;
-            let streams = client
-                .list()
-                .await?
-                .into_iter()
-                .map(|s| async move { Ok((s, client.content(s).await?)) });
-            let streams = futures::future::join_all(streams)
-                .await
-                .into_iter()
-                .collect::<Result<Vec<_>>>()?;
-            print_streams(streams.into_iter());
+        Command::Search => {
+            let stream = match crate::meili::select_stream(meili_url.parse()?).await? {
+                Some(stream) => stream,
+                None => return Ok(()),
+            };
+            println!("{}", stream);
         }
-        Command::Url(StreamOpts { stream }) => {
-            let stream = client.content(stream).await?;
-            let url = client.url(stream);
-            println!("{}", url);
-        }
-        Command::Open(StreamOpts { stream }) => {
+        Command::Open(MaybeStreamOpts { stream }) => {
+            let stream = if let Some(stream) = stream {
+                stream
+            } else {
+                match crate::meili::select_stream(meili_url.parse()?).await? {
+                    Some(stream) => stream,
+                    None => return Ok(()),
+                }
+            };
             let stream = client.content(stream).await?;
             let url = client.url(stream);
             // TODO: pass mime type to open
             open::that(url.to_string())?;
+        }
+        Command::Info(StreamOpts { stream }) => {
+            print_stream(&client, stream, false).await?;
         }
         Command::Create(CreateOpts {
             file,
@@ -147,12 +159,7 @@ async fn main() -> Result<()> {
                 };
             metadata.insert("source".into(), format!("{file}").into());
             let manifest = client.manifest(stream, metadata, content).await?;
-
-            if quiet {
-                println!("{}", manifest);
-            } else {
-                print_streams(std::iter::once((manifest, stream)));
-            }
+            print_stream(&client, manifest, quiet).await?;
         }
         Command::Read(RangeOpts { stream }) => {
             let data = client.read(stream, None).await?;
@@ -181,19 +188,25 @@ fn to_mime(mime: Option<surf::http::Mime>) -> Result<Mime> {
     }
 }
 
-fn print_streams(streams: impl Iterator<Item = (StreamId, StreamId)>) {
-    println!("| {:<60} | {:<10} | {:<30} |", "stream", "length", "mime",);
-    for (stream, content) in streams {
-        if stream.mime() != Mime::ApplicationPeershare {
-            continue;
-        }
-        println!(
-            "| {:<60} | {:>10} | {:<30} |",
-            format!("{stream}"),
-            stream.length(),
-            format!("{}", content.mime()),
-        );
+async fn print_stream(client: &Client, stream: StreamId, quiet: bool) -> Result<()> {
+    if quiet {
+        println!("{}", stream);
+        return Ok(());
     }
+    let content = client.content(stream).await?;
+    let url = client.url(content);
+    println!(
+        "| {:<60} | {:<10} | {:<30} | url",
+        "stream", "length", "mime",
+    );
+    println!(
+        "| {:<60} | {:>10} | {:<30} | {}",
+        format!("{stream}"),
+        stream.length(),
+        format!("{}", content.mime()),
+        url,
+    );
+    Ok(())
 }
 
 fn print_ranges(ranges: impl Iterator<Item = Range>) {
