@@ -34,7 +34,9 @@ struct CreateOpts {
     file: File,
     #[clap(short)]
     quiet: bool,
+    #[clap(long)]
     metadata: Option<PathBuf>,
+    #[clap(long)]
     content: Option<PathBuf>,
 }
 
